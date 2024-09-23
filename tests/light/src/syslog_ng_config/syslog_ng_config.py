@@ -21,6 +21,7 @@
 #
 #############################################################################
 import logging
+from pathlib import Path
 
 from src.common.file import File
 from src.common.operations import cast_to_list
@@ -36,22 +37,20 @@ from src.syslog_ng_config.statements.destinations.unix_dgram_destination import 
 from src.syslog_ng_config.statements.destinations.unix_stream_destination import UnixStreamDestination
 from src.syslog_ng_config.statements.filters.filter import Filter
 from src.syslog_ng_config.statements.filters.filter import RateLimit
+from src.syslog_ng_config.statements.filterx.filterx import Filterx
 from src.syslog_ng_config.statements.logpath.logpath import LogPath
 from src.syslog_ng_config.statements.parsers.db_parser import DBParser
 from src.syslog_ng_config.statements.parsers.parser import Parser
-from src.syslog_ng_config.statements.rewrite.rewrite import CreditCardHash
-from src.syslog_ng_config.statements.rewrite.rewrite import CreditCardMask
-from src.syslog_ng_config.statements.rewrite.rewrite import Set
-from src.syslog_ng_config.statements.rewrite.rewrite import SetPri
-from src.syslog_ng_config.statements.rewrite.rewrite import SetTag
+from src.syslog_ng_config.statements.rewrite.rewrite import Rewrite
 from src.syslog_ng_config.statements.sources.example_msg_generator_source import ExampleMsgGeneratorSource
 from src.syslog_ng_config.statements.sources.file_source import FileSource
+from src.syslog_ng_config.statements.sources.wildcard_file_source import WildcardFileSource as WFileSource
 from src.syslog_ng_config.statements.sources.internal_source import InternalSource
 from src.syslog_ng_config.statements.sources.network_source import NetworkSource
+from src.syslog_ng_config.statements.sources.syslog_source import SyslogSource
 from src.syslog_ng_config.statements.template.template import Template
 from src.syslog_ng_config.statements.template.template import TemplateFunction
 from src.syslog_ng_ctl.prometheus_stats_handler import PrometheusStatsHandler
-
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +58,9 @@ logger = logging.getLogger(__name__)
 class SyslogNgConfig(object):
     def __init__(self, version, teardown):
         self.__raw_config = None
+        self.version = version
         self.__syslog_ng_config = {
-            "version": version,
+            "version": self.version,
             "includes": [],
             "global_options": {},
             "preamble": "",
@@ -69,6 +69,7 @@ class SyslogNgConfig(object):
             "logpath_groups": [],
         }
         self.teardown = teardown
+        self.syslog_ng_config_file = None
 
     stringify = staticmethod(stringify)
 
@@ -85,9 +86,11 @@ class SyslogNgConfig(object):
             rendered_config = ConfigRenderer(self.__syslog_ng_config).get_rendered_config()
         logger.info("Generated syslog-ng config\n{}\n".format(rendered_config))
 
-        syslog_ng_config_file = File(config_path)
-        syslog_ng_config_file.write_content_and_close(rendered_config)
+        Path(config_path).unlink(missing_ok=True)
+        self.syslog_ng_config_file = File(config_path)
+        self.syslog_ng_config_file.write_content_and_close(rendered_config)
 
+    ### Top level config elements
     def set_version(self, version):
         self.__syslog_ng_config["version"] = version
 
@@ -106,29 +109,6 @@ class SyslogNgConfig(object):
     def add_template(self, template):
         self.__syslog_ng_config["templates"].append(template)
 
-    def create_file_source(self, **options):
-        file_source = FileSource(**options)
-        self.teardown.register(file_source.close_file)
-        return file_source
-
-    def create_example_msg_generator_source(self, **options):
-        return ExampleMsgGeneratorSource(**options)
-
-    def create_internal_source(self, **options):
-        return InternalSource(**options)
-
-    def create_network_source(self, **options):
-        return NetworkSource(**options)
-
-    def create_rewrite_set(self, template, **options):
-        return Set(template, **options)
-
-    def create_rewrite_set_tag(self, tag, **options):
-        return SetTag(tag, **options)
-
-    def create_rewrite_set_pri(self, pri, **options):
-        return SetPri(pri, **options)
-
     def create_template(self, template, **options):
         return Template(template, **options)
 
@@ -137,82 +117,6 @@ class SyslogNgConfig(object):
 
     def create_filter(self, expr=None, **options):
         return Filter("", [expr] if expr else [], **options)
-
-    def create_rate_limit_filter(self, **options):
-        return RateLimit(**options)
-
-    def create_app_parser(self, **options):
-        return Parser("app-parser", **options)
-
-    def create_checkpoint_parser(self, **options):
-        return Parser("checkpoint-parser", **options)
-
-    def create_panos_parser(self, **options):
-        return Parser("panos-parser", **options)
-
-    def create_regexp_parser(self, **options):
-        return Parser("regexp-parser", **options)
-
-    def create_csv_parser(self, **options):
-        return Parser("csv-parser", **options)
-
-    def create_metrics_probe(self, **options):
-        return Parser("metrics_probe", **options)
-
-    def create_syslog_parser(self, **options):
-        return Parser("syslog-parser", **options)
-
-    def create_sdata_parser(self, **options):
-        return Parser("sdata-parser", **options)
-
-    def create_group_lines_parser(self, **options):
-        return Parser("group-lines", **options)
-
-    def create_cisco_parser(self, **options):
-        return Parser("cisco-parser", **options)
-
-    def create_mariadb_audit_parser(self, **options):
-        return Parser("mariadb-audit-parser", **options)
-
-    def create_postgresql_csvlog_parser(self, **options):
-        return Parser("postgresql-csvlog-parser", **options)
-
-    def create_file_destination(self, **options):
-        file_destination = FileDestination(**options)
-        self.teardown.register(file_destination.close_file)
-        return file_destination
-
-    def create_example_destination(self, **options):
-        example_destination = ExampleDestination(**options)
-        self.teardown.register(example_destination.close_file)
-        return example_destination
-
-    def create_snmp_destination(self, **options):
-        return SnmpDestination(**options)
-
-    def create_network_destination(self, **options):
-        network_destination = NetworkDestination(**options)
-        self.teardown.register(network_destination.stop_listener)
-        return network_destination
-
-    def create_unix_dgram_destination(self, **options):
-        unix_dgram_destination = UnixDgramDestination(**options)
-        self.teardown.register(unix_dgram_destination.stop_listener)
-        return unix_dgram_destination
-
-    def create_unix_stream_destination(self, **options):
-        unix_stream_source = UnixStreamDestination(**options)
-        self.teardown.register(unix_stream_source.stop_listener)
-        return unix_stream_source
-
-    def create_db_parser(self, config, **options):
-        return DBParser(config, **options)
-
-    def create_rewrite_credit_card_mask(self, **options):
-        return CreditCardMask(**options)
-
-    def create_rewrite_credit_card_hash(self, **options):
-        return CreditCardHash(**options)
 
     def create_logpath(self, name=None, statements=None, flags=None):
         logpath = self.__create_logpath_with_conversion(name, statements, flags)
@@ -252,3 +156,173 @@ class SyslogNgConfig(object):
 
     def get_prometheus_samples(self, metric_filter):
         return PrometheusStatsHandler(metric_filter).get_samples()
+
+    def reset(self):
+        self.__raw_config = None
+        self.__syslog_ng_config = {
+            "version": self.version,
+            "includes": [],
+            "global_options": {},
+            "preamble": "",
+            "templates": [],
+            "statement_groups": [],
+            "logpath_groups": [],
+        }
+
+    def create_raw_logpath(self, raw_logpath):
+        self.syslog_ng_config_file.write_content_and_close(raw_logpath, "a+")
+        print("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
+
+
+    def set_perf_test_config(self, config, source_driver=None, destination_driver=None):
+        if not source_driver:
+            pass
+        if not destination_driver:
+            destination_driver = config.create_file_destination(file_name="/dev/null")
+        config.create_logpath(statements=[source_driver, destination_driver])
+        config.update_global_options(stats="level(1)")
+        return config, source_driver, destination_driver
+    
+    def create_filterx(self, filterx_content):
+        return Filterx("filterx", filterx_content)
+
+    ### Source drivers
+    def create_file_source(self, **options):
+        file_source = FileSource(**options)
+        self.teardown.register(file_source.close_file)
+        return file_source
+
+    def create_wildcard_file_source(self, base_dir, filename_pattern, **options):
+        wildcard_file_source = WFileSource(base_dir, filename_pattern, **options)
+        return wildcard_file_source
+
+    def create_example_msg_generator_source(self, **options):
+        return ExampleMsgGeneratorSource(**options)
+
+    def create_internal_source(self, **options):
+        return InternalSource(**options)
+
+    def create_network_source(self, **options):
+        return NetworkSource(**options)
+
+    def create_syslog_source(self, **options):
+        return SyslogSource(**options)
+
+    ### Rewrite rules
+    def create_rewrite_set(self, template, **options):
+        return Rewrite("set", [template], **options)
+
+    def create_rewrite_set_tag(self, tag, **options):
+        return Rewrite("set_tag", [tag], **options)
+
+    def create_rewrite_set_pri(self, pri, **options):
+        return Rewrite("set_pri", [pri], **options)
+
+    def create_rewrite_fix_time_zone(self, **options):
+        return Rewrite("fix_time_zone", **options)
+
+    def create_rewrite_guess_time_zone(self, **options):
+        return Rewrite("guess_time_zone", **options)
+
+    def create_rewrite_set_time_zone(self, **options):
+        return Rewrite("set_time_zone", **options)
+
+    def create_rewrite_credit_card_mask(self, **options):
+        return Rewrite("credit-card-mask", [], **options)
+
+    def create_rewrite_credit_card_hash(self, **options):
+        return Rewrite("credit-card-hash", [], **options)
+    
+    def create_rewrite_credit_card_internal(self, **options):
+        return Rewrite("credit-card-internal", [], **options)
+    
+    def create_rewrite_credit_card_visa(self, **options):
+        return Rewrite("credit-card-visa", [], **options)
+    
+    def create_rewrite_credit_card_mastercard(self, **options):
+        return Rewrite("credit-card-mastercard", [], **options)
+    
+    def create_rewrite_credit_card_american_express(self, **options):
+        return Rewrite("credit-card-american-express", [], **options)
+    
+    def create_rewrite_credit_card_diners_club(self, **options):
+        return Rewrite("credit-card-diners-club", [], **options)
+    
+    def create_rewrite_credit_card_discover(self, **options):
+        return Rewrite("credit-card-discover", [], **options)
+    
+    def create_rewrite_credit_card_jcb(self, **options):
+        return Rewrite("credit-card-jcb", [], **options)
+
+    ### Filter statements
+    def create_rate_limit_filter(self, **options):
+        return RateLimit(**options)
+
+    ### Parser statements
+    def create_app_parser(self, **options):
+        return Parser("app-parser", **options)
+
+    def create_checkpoint_parser(self, **options):
+        return Parser("checkpoint-parser", **options)
+
+    def create_panos_parser(self, **options):
+        return Parser("panos-parser", **options)
+
+    def create_regexp_parser(self, **options):
+        return Parser("regexp-parser", **options)
+
+    def create_csv_parser(self, **options):
+        return Parser("csv-parser", **options)
+
+    def create_metrics_probe(self, **options):
+        return Parser("metrics_probe", **options)
+
+    def create_syslog_parser(self, **options):
+        return Parser("syslog-parser", **options)
+
+    def create_sdata_parser(self, **options):
+        return Parser("sdata-parser", **options)
+
+    def create_group_lines_parser(self, **options):
+        return Parser("group-lines", **options)
+
+    def create_cisco_parser(self, **options):
+        return Parser("cisco-parser", **options)
+
+    def create_mariadb_audit_parser(self, **options):
+        return Parser("mariadb-audit-parser", **options)
+
+    def create_postgresql_csvlog_parser(self, **options):
+        return Parser("postgresql-csvlog-parser", **options)
+
+    def create_db_parser(self, config, **options):
+        return DBParser(config, **options)
+
+    ### Destination drivers
+    def create_file_destination(self, **options):
+        file_destination = FileDestination(**options)
+        self.teardown.register(file_destination.close_file)
+        return file_destination
+
+    def create_example_destination(self, **options):
+        example_destination = ExampleDestination(**options)
+        self.teardown.register(example_destination.close_file)
+        return example_destination
+
+    def create_snmp_destination(self, **options):
+        return SnmpDestination(**options)
+
+    def create_network_destination(self, **options):
+        network_destination = NetworkDestination(**options)
+        self.teardown.register(network_destination.stop_listener)
+        return network_destination
+
+    def create_unix_dgram_destination(self, **options):
+        unix_dgram_destination = UnixDgramDestination(**options)
+        self.teardown.register(unix_dgram_destination.stop_listener)
+        return unix_dgram_destination
+
+    def create_unix_stream_destination(self, **options):
+        unix_stream_source = UnixStreamDestination(**options)
+        self.teardown.register(unix_stream_source.stop_listener)
+        return unix_stream_source

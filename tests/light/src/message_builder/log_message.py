@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #!/usr/bin/env python
 #############################################################################
 # Copyright (c) 2015-2018 Balabit
@@ -26,13 +27,16 @@ import time
 class LogMessage(object):
     def __init__(self):
         self.priority_value = "38"
+        self.syslog_protocol_version = "1"
         self.timestamp_value = time.time()
         self.bsd_timestamp_value = "Feb 11 21:27:22"
-        self.iso_timestamp_value = "2019-02-11T21:27:22+01:00"
-        self.hostname_value = "testhost"
-        self.program_value = "testprogram"
-        self.pid_value = "9999"
-        self.message_value = "test message"
+        self.iso_timestamp_value = "2024-09-15T03:34:57+00:00"
+        self.hostname_value = "localhost"
+        self.program_value = "prg00000"
+        self.pid_value = "1234"
+        self.message_id = "-"
+        self.sdata = '-'
+        self.message_value = u"seq: 0000000000, thread: 0000, runid: 1726371297, stamp: 2024-09-15T03:34:57 üóöóüűáéÚŐÁÉŰÖÜÖÓ"
 
     def priority(self, pri):
         self.priority_value = pri
@@ -40,6 +44,10 @@ class LogMessage(object):
 
     def remove_priority(self):
         self.priority_value = ""
+        return self
+
+    def syslog_protocol_version(self, protocol_version):
+        self.syslog_protocol_version = protocol_version
         return self
 
     def timestamp(self, timestamp):
@@ -56,6 +64,14 @@ class LogMessage(object):
 
     def pid(self, pid):
         self.pid_value = pid
+        return self
+
+    def message_id(self, msg_id):
+        self.message_id = msg_id
+        return self
+
+    def sdata(self, sdata):
+        self.sdata = sdata
         return self
 
     def message(self, message):

@@ -43,20 +43,15 @@ def create_io(options):
     ip = options["ip"] if "ip" in options else "localhost"
     transport = options["transport"] if "transport" in options else "tcp"
 
-    return NetworkIO(ip, options["port"], map_transport(transport))
+    return NetworkIO(ip, options["port"], map_transport(transport), syslog_proto=True)
 
 
-class NetworkSource(SourceDriver):
+class SyslogSource(SourceDriver):
     def __init__(self, **options):
-        if "ip" not in options:
-            options["ip"] = "localhost"
-        if "port" not in options:
-            options["port"] = 30001
-
         self.io = create_io(options)
 
-        self.driver_name = "network"
-        super(NetworkSource, self).__init__(options=options)
+        self.driver_name = "syslog"
+        super(SyslogSource, self).__init__(options=options)
 
     def write_log(self, formatted_content, rate=None):
         self.io.write(formatted_content, rate=rate)

@@ -92,6 +92,7 @@ msg_generator_sd_new(GlobalConfig *cfg)
 {
   MsgGeneratorSourceDriver *self = g_new0(MsgGeneratorSourceDriver, 1);
   log_src_driver_init_instance(&self->super, cfg);
+  self->source_options.super.stats_source = stats_register_type("example_msg_generator");
   msg_generator_source_options_defaults(&self->source_options);
   self->source_options.name_value = g_hash_table_new_full(g_str_hash, g_str_equal, g_free,
                                                           (GDestroyNotify) log_template_unref);

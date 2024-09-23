@@ -59,6 +59,8 @@ class PrometheusStatsHandler(object):
             return []
 
         ctl_output = self.__syslog_ng_ctl.stats_prometheus()
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        print(ctl_output)
         if ctl_output["exit_code"] != 0:
             return []
 

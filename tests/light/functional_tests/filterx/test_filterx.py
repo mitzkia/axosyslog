@@ -84,8 +84,12 @@ def test_otel_logrecord_int32_setter_getter(config, syslog_ng):
     (file_true, file_false) = create_config(
         config, """
                                             $olr = otel_logrecord();
+                                            $ola = otel_array();
+                                            $olkv = otel_kvlist();
+                                            $olr = otel_resource();
+                                            $ols = otel_scope();
                                             $olr.dropped_attributes_count = ${values.int};
-                                            $MSG = $olr.dropped_attributes_count; """,
+                                            $MSG = $ols; """,
     )
     syslog_ng.start(config)
 

@@ -29,28 +29,3 @@ class Rewrite(object):
         self.driver_name = driver_name
         self.options = options
         self.positional_parameters = positional_parameters
-
-
-class SetTag(Rewrite):
-    def __init__(self, tag, **options):
-        super(SetTag, self).__init__("set_tag", [tag], **options)
-
-
-class Set(Rewrite):
-    def __init__(self, template, **options):
-        super(Set, self).__init__("set", [template], **options)
-
-
-class SetPri(Rewrite):
-    def __init__(self, pri, **options):
-        super(SetPri, self).__init__("set_pri", [pri], **options)
-
-
-class CreditCardHash(Rewrite):
-    def __init__(self, **options):
-        super(CreditCardHash, self).__init__("credit-card-hash", [], **options)
-
-
-class CreditCardMask(Rewrite):
-    def __init__(self, **options):
-        super(CreditCardMask, self).__init__("credit-card-mask", [], **options)

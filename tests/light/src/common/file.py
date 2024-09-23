@@ -113,9 +113,9 @@ class File(object):
         self.__opened_file.write(content)
         self.__opened_file.flush()
 
-    def write_content_and_close(self, content):
+    def write_content_and_close(self, content, file_mode="a+"):
         if not self.is_opened():
-            self.open(mode="w+")
+            self.open(mode=file_mode)
         self.write(content)
         self.close()
 

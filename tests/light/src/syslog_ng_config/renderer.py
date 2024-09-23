@@ -153,6 +153,8 @@ def render_statement_groups(statement_groups):
     config_snippet = ""
 
     for statement_group in statement_groups:
+        if statement_group.group_type == "filterx":
+            continue
         # statement header
         config_snippet += "\n{} {} {{\n".format(
             statement_group.group_type, statement_group.group_id,
@@ -187,7 +189,11 @@ def render_logpath_groups(logpath_groups, depth=0):
             if statement_group.group_type == "log":
                 config_snippet += render_logpath_groups(logpath_groups=[statement_group], depth=depth + 1)
             else:
-                config_snippet += _indent("{}({});\n".format(statement_group.group_type, statement_group.group_id), depth + 1)
+                if statement_group.group_type == "filterx":
+                    config_snippet += _indent("filterx {{{}".format(statement_group[0].driver_raw_content), depth + 1)
+                    config_snippet += _indent("};\n", depth + 1)
+                else:
+                    config_snippet += _indent("{}({});\n".format(statement_group.group_type, statement_group.group_id), depth + 1)
         if logpath_group.flags:
             config_snippet += _indent("flags({});\n".format("".join(logpath_group.flags)), depth + 1)
         config_snippet += _indent("};\n", depth)

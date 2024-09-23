@@ -38,9 +38,12 @@ class DriverStatsHandler(object):
             self.component = "{}".format(group_type)
         elif group_type == "filter":
             self.component = "{}".format(group_type)
+        elif group_type == "filterx":
+            self.component = "{}".format(group_type)
         else:
             raise Exception("Unknown group_type: {}".format(group_type))
 
+        self.parsed_output = {}
         self.instance = instance
         self.syslog_ng_ctl = SyslogNgCtl(tc_parameters.INSTANCE_PATH)
 
@@ -73,15 +76,18 @@ class DriverStatsHandler(object):
         return {key: int(value)}
 
     def parse_result(self, result, result_type):
-        parsed_output = {}
         for line in result:
             if result_type == "query":
-                parsed_output.update(self.__parse_query_result(line))
+                self.parsed_output.update(self.__parse_query_result(line))
             elif result_type == "stats":
-                parsed_output.update(self.__parse_stats_result(line))
+                if list(self.__parse_stats_result(line).keys())[0] in self.parsed_output:
+                    if list(self.__parse_stats_result(line).keys())[0] == "processed":
+                        self.parsed_output["processed"] += list(self.__parse_stats_result(line).values())[0]
+                else:
+                    self.parsed_output.update(self.__parse_stats_result(line))
             else:
                 raise Exception("Unknown result_type: {}".format(result_type))
-        return parsed_output
+        return self.parsed_output
 
     def filter_stats_result(self, stats_result, stats_pattern):
         filtered_list = []

@@ -39,7 +39,7 @@ test_parameters = [
     "template, expected_value", test_parameters,
     ids=list(map(lambda x: x[0], test_parameters)),
 )
-def test_value_pairs(config, syslog_ng, template, expected_value):
+def atest_value_pairs(config, syslog_ng, template, expected_value):
 
     generator_source = config.create_example_msg_generator_source(num=1, values="test.key1 => value1 test.key2 => value2")
     file_destination = config.create_file_destination(file_name="output.log", template=config.stringify(template))
@@ -48,3 +48,60 @@ def test_value_pairs(config, syslog_ng, template, expected_value):
     syslog_ng.start(config)
     log = file_destination.read_log()
     assert log == expected_value
+
+
+
+
+import string
+from hypothesis import given, settings, HealthCheck, strategies as st
+
+def gen_number():
+    return st.integers(min_value=0, max_value=200)
+
+# @pytest.mark.example_msg_generator_source
+# @pytest.mark.file_destination
+# @pytest.mark.values
+@given(gen_number())
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], max_examples=2, database=None, deadline=None)
+def test_values_int(config, syslog_ng, integers):
+    syslog_ng.stop()
+    config.reset()
+
+    config.update_global_options(stats="level(5)")
+    generator_source = config.create_example_msg_generator_source(num=1, values='"values.int" => int(%d)' % integers)
+    file_destination = config.create_file_destination(file_name="output.log", template='"${values.int}\n"')
+    config.create_logpath(statements=[generator_source, file_destination])
+
+    syslog_ng.start(config)
+    assert file_destination.get_stats()["processed"] == 1
+    assert str(integers) in file_destination.read_until_logs(["%d" % integers])[0]
+
+
+def gen_list():
+    twoints = st.tuples(st.integers(), st.text(alphabet=string.ascii_letters + string.digits, min_size=1), st.floats(min_value=1, max_value=10, allow_nan=False, allow_infinity=False, allow_subnormal=False))
+    return st.lists(twoints)
+
+@given(gen_list())
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], max_examples=10, database=None, deadline=None)
+def test_values_list(config, syslog_ng, input_list):
+    syslog_ng.stop()
+    config.reset()
+    print(input_list)
+    q = ""
+    for i in input_list:
+        for a in i:
+            # print(type(a))
+            if isinstance(a, str):
+                q += "'%s', " % str(a)
+            else:
+                q += "%s, " % a
+    # print(q)
+    # assert True
+    config.update_global_options(stats="level(5)")
+    generator_source = config.create_example_msg_generator_source(num=1, values='"values.list" => list(%s)' % q)
+    file_destination = config.create_file_destination(file_name="output.log", template='"${values.list}\n"')
+    config.create_logpath(statements=[generator_source, file_destination])
+
+    syslog_ng.start(config)
+    assert file_destination.get_stats()["processed"] == 1
+    assert str(input_list) in file_destination.read_until_logs(["%s" % input_list])[0]

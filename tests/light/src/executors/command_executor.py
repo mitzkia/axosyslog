@@ -53,19 +53,27 @@ class CommandExecutor(object):
     def __init__(self):
         self.__start_timeout = 10
 
-    def run(self, command, stdout_path, stderr_path):
+    def run(self, command, stdout_path, stderr_path, detach=False):
         printable_command = prepare_printable_command(command)
         executable_command = prepare_executable_command(command)
         stdout, stderr = prepare_std_outputs(stdout_path, stderr_path)
         logger.debug("The following command will be executed:\n{}\n".format(printable_command))
-        cmd = psutil.Popen(executable_command, stdout=stdout.open(mode="w"), stderr=stderr.open(mode="w"))
-        exit_code = cmd.wait(timeout=self.__start_timeout)
+        if detach:
+            print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            cmd = psutil.Popen(executable_command, stdout=stdout.open(mode="w"), stderr=stderr.open(mode="w"), start_new_session=True)
+            stdout.close()
+            stderr.close()
+            stdout_content, stderr_content = self.__process_std_outputs(stdout, stderr)
+            return {"exit_code": 0, "stdout": stdout_content, "stderr": stderr_content}
+        else:
+            cmd = psutil.Popen(executable_command, stdout=stdout.open(mode="w"), stderr=stderr.open(mode="w"))
+            exit_code = cmd.wait(timeout=self.__start_timeout)
 
-        stdout.close()
-        stderr.close()
-        stdout_content, stderr_content = self.__process_std_outputs(stdout, stderr)
-        self.__process_exit_code(printable_command, exit_code, stdout_content, stderr_content)
-        return {"exit_code": exit_code, "stdout": stdout_content, "stderr": stderr_content}
+            stdout.close()
+            stderr.close()
+            stdout_content, stderr_content = self.__process_std_outputs(stdout, stderr)
+            self.__process_exit_code(printable_command, exit_code, stdout_content, stderr_content)
+            return {"exit_code": exit_code, "stdout": stdout_content, "stderr": stderr_content}
 
     def __process_std_outputs(self, stdout, stderr):
         stdout.open("r")

@@ -29,6 +29,7 @@ VERSION ?= $(shell MODE=${MODE} scripts/version.sh)
 DOCKER_RUN_ARGS=-e USER_NAME_ON_HOST=$(shell whoami)	\
         --network=host --privileged \
 	--ulimit nofile=1024:1024 \
+	--ulimit core=-1 \
 	-v $(ROOT_DIR):/source \
         -v $(DBLD_DIR):/dbld \
 	-v $(DBLD_DIR)/build:/build \

@@ -32,6 +32,7 @@ import src.testcase_parameters.testcase_parameters as tc_parameters
 from src.helpers.loggen.loggen import Loggen
 from src.message_builder.bsd_format import BSDFormat
 from src.message_builder.log_message import LogMessage
+from src.message_builder.syslog_format import SyslogFormat
 from src.syslog_ng.syslog_ng import SyslogNg
 from src.syslog_ng.syslog_ng_paths import SyslogNgPaths
 from src.syslog_ng_config.syslog_ng_config import SyslogNgConfig
@@ -141,6 +142,9 @@ def syslog_ng_ctl(syslog_ng):
 def bsd_formatter():
     return BSDFormat()
 
+@pytest.fixture
+def syslog_formatter():
+    return SyslogFormat()
 
 @pytest.fixture
 def log_message():

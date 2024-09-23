@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #############################################################################
-# Copyright (c) 2015-2018 Balabit
+# Copyright (c) 2024 Andras Mitzki
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License version 2 as published
@@ -20,27 +20,39 @@
 # COPYING for details.
 #
 #############################################################################
-from src.syslog_ng_ctl.driver_stats_handler import DriverStatsHandler
+import logging
+from pathlib import Path
+
+from src.driver_io.file.file_io import FileIO
+from src.syslog_ng_config.statements.sources.source_driver import SourceDriver
+
+logger = logging.getLogger(__name__)
 
 
-class SourceDriver(object):
-    group_type = "source"
-    driver_instance = ""
+class PipeSource(SourceDriver):
+    def __init__(self, file_name, **options):
+        self.driver_name = "pipe"
+        self.set_path(file_name)
+        import os
+        os.mkfifo(self.get_path())
+        self.io = FileIO(self.get_path())
+        super(PipeSource, self).__init__([self.path], options)
 
-    def __init__(self, positional_parameters=None, options=None):
-        if positional_parameters is None:
-            positional_parameters = []
-        self.positional_parameters = positional_parameters
-        if options is None:
-            options = {}
-        self.options = options
-        self.stats_handler = DriverStatsHandler(group_type=self.group_type, driver_name=self.driver_name, instance=self.driver_instance)
+    def get_path(self):
+        return self.path
+
+    def set_path(self, pathname):
+        self.path = Path(pathname)
 
     def write_log(self, formatted_log, counter=1):
-        raise NotImplementedError("write_log method is not implemented")
+        for _ in range(counter):
 
-    def get_stats(self):
-        return self.stats_handler.get_stats()
+            self.io.write(formatted_log)
+        logger.info(
+            "Content has been written to\nresource: {}\n"
+            "number of times: {}\n"
+            "content: {}\n".format(self.get_path(), counter, formatted_log),
+        )
 
-    def get_query(self):
-        return self.stats_handler.get_query()
+    def close_file(self):
+        self.io.close_writeable_file()

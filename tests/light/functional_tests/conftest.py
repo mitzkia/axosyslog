@@ -29,6 +29,8 @@ import pytest
 
 from src.common.file import copy_file
 from src.common.pytest_operations import calculate_testcase_name
+from src.message_builder.bsd_format import BSDFormat
+from src.message_builder.log_message import LogMessage
 
 logger = logging.getLogger(__name__)
 
@@ -104,3 +106,7 @@ def port_allocator():
         return PortAllocator.CURRENT_DYNAMIC_PORT
 
     return get_next_port
+
+
+def get_log_message_for_performance_test():
+    return BSDFormat.format_message(LogMessage().message("PADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADDPADD"))

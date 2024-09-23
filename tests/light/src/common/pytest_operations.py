@@ -20,9 +20,12 @@
 # COPYING for details.
 #
 #############################################################################
-
+import random
 
 def calculate_testcase_name(item_name):
     # In case of parametrized tests we need to replace "[" and "]" because
     # testcase name will appear in directory name
-    return item_name.replace("[", "_").replace("]", "_")
+    testcase_name = item_name.replace("[", "_").replace("]", "_").replace(",", "_").replace("(", "_").replace(")", "_")
+    if len(testcase_name) > 100:
+        return "%s_%s" % (testcase_name[:20], random.randint(1, 1000000))
+    return testcase_name

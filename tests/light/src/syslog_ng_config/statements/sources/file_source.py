@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class FileSource(SourceDriver):
-    def __init__(self, file_name, **options):
+    def __init__(self, file_name="input.log", **options):
         self.driver_name = "file"
         self.set_path(file_name)
         self.io = FileIO(self.get_path())

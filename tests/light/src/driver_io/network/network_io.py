@@ -36,11 +36,12 @@ from src.helpers.loggen.loggen import Loggen
 
 
 class NetworkIO():
-    def __init__(self, ip, port, transport, ip_proto_version=None):
+    def __init__(self, ip, port, transport, ip_proto_version=None, syslog_proto=None):
         self.__ip = ip
         self.__port = port
         self.__transport = transport
         self.__ip_proto_version = NetworkIO.IPProtoVersion.V4 if ip_proto_version is None else ip_proto_version
+        self.__syslog_proto = syslog_proto
         self.__server = None
         self.__message_reader = None
 
@@ -50,7 +51,7 @@ class NetworkIO():
         loggen_input_file = File(loggen_input_file_path)
         loggen_input_file.write_content_and_close(content)
 
-        Loggen().start(self.__ip, self.__port, read_file=str(loggen_input_file_path), dont_parse=True, permanent=True, rate=rate, **self.__transport.value)
+        Loggen().start(self.__ip, self.__port, read_file=str(loggen_input_file_path), dont_parse=True, permanent=True, rate=rate, syslog_proto=self.__syslog_proto, **self.__transport.value)
 
     def start_listener(self):
         self.__message_reader, self.__server = self.__transport.construct(self.__port, self.__ip, self.__ip_proto_version)

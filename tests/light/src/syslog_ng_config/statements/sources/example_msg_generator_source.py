@@ -28,3 +28,7 @@ class ExampleMsgGeneratorSource(SourceDriver):
         self.driver_name = "example_msg_generator"
         self.DEFAULT_MESSAGE = "-- Generated message. --"
         super(ExampleMsgGeneratorSource, self).__init__(None, options)
+
+    def write_log(self, formatted_log, counter=1):
+        ## This is a dummy method, it does nothing
+        pass
