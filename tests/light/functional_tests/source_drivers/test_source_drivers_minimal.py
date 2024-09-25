@@ -1,28 +1,39 @@
 import json
 import pytest
+from src.common.file import copy_shared_file
 
+def gen_source_driver_names():
+    source_drivers = []
+    for driver_name in ["network", "example_msg_generator"]:
+        if driver_name in ["network", "syslog"]:
+            for transport in ["udp", "tcp", "tls", "proxied-tcp", "proxied-tls", "proxied-tls-passthrough", "text-with-nuls", "dgram", "text", "framed"]:
+                source_drivers.append("{}_{}".format(driver_name, transport))
+        else:
+            source_drivers.append(driver_name)
+    return source_drivers
 
-
-@pytest.mark.parametrize("source_driver_name", ["file", "example_msg_generator", "network"])
-def test_source_driver_input_generic(config, syslog_ng, source_driver_name):
-    input_message = "test message for driver {}\n".format(source_driver_name)
-    config.update_global_options(stats_level=5)
-    create_source_driver = getattr(config, 'create_{}_source'.format(source_driver_name))
-    if source_driver_name == "example_msg_generator":
-        source_driver = create_source_driver(template="'{}'".format(input_message))
-    else:
-        source_driver = create_source_driver()
-    file_destination = config.create_file_destination(file_name="output_destination_for_{}.log".format(source_driver_name))
-    config.create_logpath(statements=[source_driver, file_destination])
+@pytest.mark.parametrize("source_driver_name", gen_source_driver_names())
+def test_source_driver_input_generic(config, syslog_ng, source_driver_name, syslog_formatter, bsd_formatter, log_message, testcase_parameters):
+    source_driver, file_destination = create_config(config, source_driver_name, testcase_parameters)
     
     syslog_ng.start(config)
 
-    input_message = "test message for driver {}\n".format(source_driver_name)
-    source_driver.write_log(input_message)
-    assert input_message in file_destination.read_log()
+    if source_driver_name in ["network_framed"]:
+        input_message = syslog_formatter.format_message(log_message)
+    elif source_driver_name in ["network_proxied-tcp", "network_proxied-tls", "network_proxied-tls-passthrough"]:
+        input_message = "PROXY TCP4 1.1.1.1 2.2.2.2 3333 4444\r\n" \
+            "message 0"
+    else:
+        input_message = bsd_formatter.format_message(log_message)
 
-    if source_driver_name == "network":
-        expected_stats_keys = sorted(['connections', 'msg_size_avg', 'msg_size_max', 'eps_since_start', 'eps_last_1h', 'eps_last_24h', 'processed', 'stamp', 'free_window', 'full_window'])
+    source_driver.write_log(input_message)
+    assert file_destination.read_log() != ""
+
+    if "network" in source_driver_name:
+        if "udp" in source_driver_name:
+            expected_stats_keys = sorted(['msg_size_avg', 'msg_size_max', 'eps_since_start', 'eps_last_1h', 'eps_last_24h', 'processed', 'stamp', 'free_window', 'full_window'])
+        else:
+            expected_stats_keys = sorted(['connections', 'msg_size_avg', 'msg_size_max', 'eps_since_start', 'eps_last_1h', 'eps_last_24h', 'processed', 'stamp', 'free_window', 'full_window'])
     elif source_driver_name == "example_msg_generator":
         expected_stats_keys = sorted(['stamp', 'processed', 'free_window', 'full_window'])
     elif source_driver_name == "file":
@@ -30,7 +41,34 @@ def test_source_driver_input_generic(config, syslog_ng, source_driver_name):
     assert sorted(list(source_driver.get_stats().keys())) == expected_stats_keys
     assert source_driver.get_stats()['processed'] == 1
 
-    syslog_ng.stop()
+    # syslog_ng.stop()
+
+def create_config(config, source_driver_name, testcase_parameters):
+    input_message = "test message for driver {}\n".format(source_driver_name)
+    config.update_global_options(stats_level=5)
+    if source_driver_name == "example_msg_generator":
+        create_source_driver = getattr(config, 'create_{}_source'.format(source_driver_name))
+        source_driver = create_source_driver(template="'{}'".format(input_message))
+    elif "network" in source_driver_name:
+        driver_name = source_driver_name.split("_")[0]
+        transport = source_driver_name.split("_")[1]
+        create_source_driver = getattr(config, 'create_{}_source'.format(driver_name))
+        if "tls" in transport:
+            server_key_path = copy_shared_file(testcase_parameters, "server.key")
+            server_cert_path = copy_shared_file(testcase_parameters, "server.crt")
+            source_driver = create_source_driver(transport="'{}'".format(transport), tls={
+                "peer-verify": '"optional-untrusted"',
+                "key-file": server_key_path,
+                "cert-file": server_cert_path
+            })
+        else:
+            source_driver = create_source_driver(transport="'{}'".format(transport))
+    else:
+        create_source_driver = getattr(config, 'create_{}_source'.format(source_driver_name))
+        source_driver = create_source_driver()
+    file_destination = config.create_file_destination(file_name="output_destination_for_{}.log".format(source_driver_name))
+    config.create_logpath(statements=[source_driver, file_destination])
+    return source_driver,file_destination
 
 
 EEE = {

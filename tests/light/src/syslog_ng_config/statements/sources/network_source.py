@@ -33,6 +33,9 @@ def map_transport(transport):
         "proxied-tcp": NetworkIO.Transport.PROXIED_TCP,
         "proxied-tls": NetworkIO.Transport.PROXIED_TLS,
         "proxied-tls-passthrough": NetworkIO.Transport.PROXIED_TLS_PASSTHROUGH,
+        "dgram": NetworkIO.Transport.TCP,
+        "text": NetworkIO.Transport.TCP,
+        "framed": NetworkIO.Transport.TCP,
     }
     transport = transport.replace("_", "-").replace("'", "").replace('"', "").lower()
 
@@ -43,6 +46,8 @@ def create_io(options):
     ip = options["ip"] if "ip" in options else "localhost"
     transport = options["transport"] if "transport" in options else "tcp"
 
+    if options["transport"].split("'")[1] in ["framed"]:
+        return NetworkIO(ip, options["port"], map_transport(transport), syslog_proto=True)
     return NetworkIO(ip, options["port"], map_transport(transport))
 
 
