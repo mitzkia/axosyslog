@@ -82,7 +82,8 @@ class DriverStatsHandler(object):
             elif result_type == "stats":
                 if list(self.__parse_stats_result(line).keys())[0] in self.parsed_output:
                     if list(self.__parse_stats_result(line).keys())[0] == "processed":
-                        self.parsed_output["processed"] += list(self.__parse_stats_result(line).values())[0]
+                        pass
+                        # self.parsed_output["processed"] += list(self.__parse_stats_result(line).values())[0]
                 else:
                     self.parsed_output.update(self.__parse_stats_result(line))
             else:

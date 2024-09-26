@@ -26,13 +26,16 @@ from src.syslog_ng_config.statements.sources.source_driver import SourceDriver
 
 def map_transport(transport):
     mapping = {
+        "dgram": NetworkIO.Transport.TCP,
+        "framed": NetworkIO.Transport.TCP,
+        "proxied-tcp": NetworkIO.Transport.PROXIED_TCP,
+        "proxied-tls-passthrough": NetworkIO.Transport.PROXIED_TLS_PASSTHROUGH,
+        "proxied-tls": NetworkIO.Transport.PROXIED_TLS,
         "tcp": NetworkIO.Transport.TCP,
         "text-with-nuls": NetworkIO.Transport.TCP,
-        "udp": NetworkIO.Transport.UDP,
+        "text": NetworkIO.Transport.TCP,
         "tls": NetworkIO.Transport.TLS,
-        "proxied-tcp": NetworkIO.Transport.PROXIED_TCP,
-        "proxied-tls": NetworkIO.Transport.PROXIED_TLS,
-        "proxied-tls-passthrough": NetworkIO.Transport.PROXIED_TLS_PASSTHROUGH,
+        "udp": NetworkIO.Transport.UDP,
     }
     transport = transport.replace("_", "-").replace("'", "").replace('"', "").lower()
 
@@ -48,6 +51,11 @@ def create_io(options):
 
 class SyslogSource(SourceDriver):
     def __init__(self, **options):
+        if "ip" not in options:
+            options["ip"] = "localhost"
+        if "port" not in options:
+            options["port"] = 30001
+
         self.io = create_io(options)
 
         self.driver_name = "syslog"
