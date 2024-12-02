@@ -15,9 +15,3 @@ jobs:
             echo "Please start the workflow on a 'axosyslog-[0-9]+*' tag"
             false
           fi
-
-  publish-image:
-    uses: ./.github/workflows/axosyslog-docker.yml
-    needs: pre-check
-    with:
-      type: stable
