@@ -175,42 +175,4 @@ jobs:
 
           echo "TAGS=$TAGS" >> $GITHUB_OUTPUT
           echo "DEBUG_TAGS=${TAGS//,/-dbg,}-dbg" >> $GITHUB_OUTPUT
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        env:
-          TAGS: ${{ steps.tags.outputs.TAGS }}
-          IMAGE_NAME: ${{ needs.prepare.outputs.image-name }}
-        run: |
-          TAG_FLAGS="$(echo "$TAGS" | sed "s|[^,]*|-t &|g" | tr ',' ' ')"
-          docker buildx imagetools create $TAG_FLAGS $(printf "$IMAGE_NAME@sha256:%s " *)
-
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Download source tarball artifact
-        if: inputs.snapshot-tarball-artifact != ''
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ inputs.snapshot-tarball-artifact }}
-          path: docker/apkbuild/axoflow/axosyslog
-
-      - name: Build and push debug Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: docker
-          file: docker/alpine.dockerfile
-          platforms: ${{ env.DEBUG_PLATFORM }}
-          push: true
-          tags: ${{ steps.tags.outputs.DEBUG_TAGS }}
-          build-args: |
-            PKG_TYPE=${{ inputs.type }}
-            SNAPSHOT_VERSION=${{ inputs.snapshot-version }}
-            DEBUG=true
+          cat $GITHUB_OUTPUT
