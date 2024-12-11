@@ -51,7 +51,7 @@ subpackages="
 	$pkgname-python3:_python3
 	$pkgname-grpc:_grpc
 	"
-source="https://github.com/axoflow/axosyslog/releases/download/axosyslog-$pkgver/axosyslog-$pkgver.tar.gz
+source="https://github.com/mitzkia/axosyslog/releases/download/axosyslog-$pkgver/axosyslog-$pkgver.tar.gz
 	"
 builddir="$srcdir/axosyslog-$pkgver"
 
