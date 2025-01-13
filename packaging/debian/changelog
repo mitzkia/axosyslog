@@ -1,9 +1,3 @@
-axosyslog (4.99.0-1) unstable; urgency=medium
-
-  * New upstream release 4.99.0
-
- -- unknown user <noemail@set.any.where>  Mon, 13 Jan 2025 15:24:08 +0000
-
 axosyslog (4.9.0-1) unstable; urgency=medium
 
   * New upstream release 4.9.0
