@@ -195,7 +195,7 @@ jobs:
                 echo "Rebuilding an older AxoSyslog version is not allowed. Please provide a valid git tag version."
                 exit 1
             fi
-            TAGS="ghcr.io/axoflow/axosyslog:$next_docker_tag,ghcr.io/axoflow/axosyslog:$next_docker_tag_with_patch,ghcr.io/axoflow/axosyslog:latest"
+            TAGS="ghcr.io/mitzkia/axosyslog:$next_docker_tag,ghcr.io/mitzkia/axosyslog:$next_docker_tag_with_patch,ghcr.io/mitzkia/axosyslog:latest"
             echo "tags=$TAGS" >> $GITHUB_OUTPUT
           fi
 
