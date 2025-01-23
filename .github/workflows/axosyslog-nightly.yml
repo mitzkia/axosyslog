@@ -74,7 +74,6 @@ jobs:
       pkg-type: nightly
 
   publish-image:
-    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/axosyslog-docker.yml
     needs: tarball
     with:
