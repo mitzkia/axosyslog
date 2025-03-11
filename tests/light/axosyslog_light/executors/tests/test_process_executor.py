@@ -21,7 +21,6 @@
 #
 #############################################################################
 from axosyslog_light.executors.process_executor import ProcessExecutor
-from axosyslog_light.self_test_fixtures import *
 
 
 def test_start_stop_process(tmpdir):
