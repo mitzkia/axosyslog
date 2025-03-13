@@ -54,5 +54,8 @@ class FileDestination(DestinationDriver):
     def read_until_logs(self, logs):
         return self.io.read_until_messages(logs)
 
+    def read_until_eof(self):
+        return self.io.read_until_eof()
+
     def close_file(self):
         self.io.close_readable_file()
