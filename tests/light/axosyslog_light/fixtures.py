@@ -61,7 +61,7 @@ class InstallDirAction(argparse.Action):
             raise argparse.ArgumentTypeError("{0} is not a valid directory".format(path))
 
         binary = Path(install_dir, "sbin/syslog-ng")
-        if not binary.exists():
+        if namespace.runner == "local" and not binary.exists():
             raise argparse.ArgumentTypeError("{0} not exist".format(binary))
 
         setattr(namespace, self.dest, path)
@@ -125,6 +125,7 @@ def pytest_runtest_logreport(report):
 def testcase_parameters(request):
     parameters = TestcaseParameters(request)
     tc_parameters.INSTANCE_PATH = SyslogNgPaths(parameters).set_syslog_ng_paths("server")
+    tc_parameters.RUNNER = request.config.getoption("--runner")
     return parameters
 
 
@@ -182,8 +183,9 @@ def syslog_ng_ctl(request: pytest.FixtureRequest, testcase_parameters, container
 
 @pytest.fixture
 def container_name(request: pytest.FixtureRequest, testcase_parameters: TestcaseParameters):
-    container_name = f"{testcase_parameters.get_testcase_name()}_{tc_parameters.INSTANCE_PATH.get_instance_name()}"
-    return re.sub(r'[^a-zA-Z0-9_.-]', '_', container_name)
+    testcase_name_and_instance = f"{testcase_parameters.get_testcase_name()}_{tc_parameters.INSTANCE_PATH.get_instance_name()}"
+    tc_parameters.CONTAINER_NAME = re.sub(r'[^a-zA-Z0-9_.-]', '_', testcase_name_and_instance)
+    return tc_parameters.CONTAINER_NAME
 
 
 @pytest.fixture

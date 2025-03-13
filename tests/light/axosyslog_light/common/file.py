@@ -149,3 +149,7 @@ class File(object):
             return self.wait_for_lines(lines, timeout)
         except Exception:
             raise Exception("Could not find {} number of lines in {}. Remaining number of lines: {}.".format(number_of_lines, self.path, len(lines)))
+
+    def read_until_eof(self):
+        first_line = self.wait_for_number_of_lines(1)
+        return first_line + self.read().splitlines()
