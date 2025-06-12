@@ -63,8 +63,13 @@ class ConsoleLogReader(object):
         if not stderr_file.is_opened():
             stderr_file.wait_for_creation()
             stderr_file.open("r")
-            self.__teardown.register(stderr_file.close)
-        return stderr_file.wait_for_lines(expected_messages, timeout=5)
+            # self.__teardown.register_early_teardown_callback(stderr_file.close)
+        if stderr_file.wait_for_lines(expected_messages, timeout=5):
+            stderr_file.close()
+            return True
+        else:
+            stderr_file.close()
+            return False
 
     def check_for_unexpected_messages(self, unexpected_messages=None):
         unexpected_patterns = ["Plugin module not found", "assertion failed", "^Bail out!", "CRITICAL"]

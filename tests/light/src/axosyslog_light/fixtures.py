@@ -147,12 +147,20 @@ def syslog_ng(request: pytest.FixtureRequest, testcase_parameters: TestcaseParam
 
 
 class TeardownRegistry:
+    early_teardown_callbacks = []
     teardown_callbacks = []
+
+    def register_early_teardown_callback(self, teardown_callback):
+        TeardownRegistry.early_teardown_callbacks.append(teardown_callback)
 
     def register(self, teardown_callback):
         TeardownRegistry.teardown_callbacks.append(teardown_callback)
 
     def execute_teardown_callbacks(self):
+
+        for early_teardown_callback in TeardownRegistry.early_teardown_callbacks:
+            early_teardown_callback()
+
         for teardown_callback in TeardownRegistry.teardown_callbacks:
             teardown_callback()
 

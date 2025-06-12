@@ -137,12 +137,12 @@ class SyslogNgConfig(object):
 
     def create_file_source(self, **options):
         file_source = FileSource(self._stats_handler, self._prometheus_stats_handler, **options)
-        self.teardown.register(file_source.close_file)
+        self.teardown.register_early_teardown_callback(file_source.close_file)
         return file_source
 
     def create_unix_dgram_source(self, **options):
         unix_dgram_source = UnixDgramSource(self._stats_handler, self._prometheus_stats_handler, **options)
-        self.teardown.register(unix_dgram_source.close_socket)
+        self.teardown.register_early_teardown_callback(unix_dgram_source.close_socket)
         return unix_dgram_source
 
     def create_example_msg_generator_source(self, **options):
@@ -231,12 +231,12 @@ class SyslogNgConfig(object):
 
     def create_file_destination(self, **options):
         file_destination = FileDestination(self._stats_handler, self._prometheus_stats_handler, **options)
-        self.teardown.register(file_destination.close_file)
+        self.teardown.register_early_teardown_callback(file_destination.close_file)
         return file_destination
 
     def create_example_destination(self, **options):
         example_destination = ExampleDestination(self._stats_handler, self._prometheus_stats_handler, **options)
-        self.teardown.register(example_destination.close_file)
+        self.teardown.register_early_teardown_callback(example_destination.close_file)
         return example_destination
 
     def create_snmp_destination(self, **options):
@@ -244,17 +244,17 @@ class SyslogNgConfig(object):
 
     def create_network_destination(self, **options):
         network_destination = NetworkDestination(self._stats_handler, self._prometheus_stats_handler, **options)
-        self.teardown.register(network_destination.stop_listener)
+        self.teardown.register_early_teardown_callback(network_destination.stop_listener)
         return network_destination
 
     def create_unix_dgram_destination(self, **options):
         unix_dgram_destination = UnixDgramDestination(self._stats_handler, self._prometheus_stats_handler, **options)
-        self.teardown.register(unix_dgram_destination.stop_listener)
+        self.teardown.register_early_teardown_callback(unix_dgram_destination.stop_listener)
         return unix_dgram_destination
 
     def create_unix_stream_destination(self, **options):
         unix_stream_source = UnixStreamDestination(self._stats_handler, self._prometheus_stats_handler, **options)
-        self.teardown.register(unix_stream_source.stop_listener)
+        self.teardown.register_early_teardown_callback(unix_stream_source.stop_listener)
         return unix_stream_source
 
     def create_db_parser(self, config, **options):
