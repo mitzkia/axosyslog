@@ -72,7 +72,7 @@ class ConsoleLogReader(object):
             return False
 
     def check_for_unexpected_messages(self, unexpected_messages=None):
-        unexpected_patterns = ["Plugin module not found", "assertion failed", "^Bail out!", "CRITICAL"]
+        unexpected_patterns = ["Plugin module not found", "assertion failed", "^Bail out!", "GLib-CRITICAL", "Segmentation fault", "core dumped"]
         if unexpected_messages is not None:
             unexpected_patterns.extend(unexpected_messages)
 
