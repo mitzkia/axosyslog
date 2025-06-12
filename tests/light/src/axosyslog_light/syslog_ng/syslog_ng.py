@@ -28,7 +28,6 @@ from subprocess import Popen
 
 from axosyslog_light.common.blocking import wait_until_false
 from axosyslog_light.common.blocking import wait_until_true
-from axosyslog_light.common.random_id import get_unique_id
 from axosyslog_light.syslog_ng.console_log_reader import ConsoleLogReader
 from axosyslog_light.syslog_ng.syslog_ng_executor import SyslogNgExecutor
 from axosyslog_light.syslog_ng.syslog_ng_executor import SyslogNgStartParams
@@ -63,6 +62,7 @@ class SyslogNg(object):
         self._syslog_ng_ctl = syslog_ng_ctl
         self._syslog_ng_executor = syslog_ng_executor
         self._process: typing.Optional[Popen] = None
+        self._saved_returncode = None
 
     def create_config(self, config_version: str, teardown) -> SyslogNgConfig:
         return SyslogNgConfig(
@@ -77,7 +77,6 @@ class SyslogNg(object):
             raise Exception("syslog-ng has been already started")
 
         config.write_config(self.instance_paths.get_config_path())
-
         self.__syntax_check()
         self.__start_syslog_ng()
 
@@ -104,6 +103,7 @@ class SyslogNg(object):
                 self._console_log_reader.handle_valgrind_log(Path(f"syslog_ng_{self.instance_paths.get_instance_name()}_valgrind_output"))
             logger.info("syslog-ng process has been stopped with PID: {}\n".format(saved_pid))
         else:
+            self.__handle_crash()
             self._console_log_reader.check_for_unexpected_messages(unexpected_messages)
         self._process = None
 
@@ -178,6 +178,7 @@ class SyslogNg(object):
         )
         returncode = process.wait()
         if returncode != 0:
+            self.__handle_crash(returncode)
             raise Exception(f"syslog-ng syntax error. See {stderr_path.absolute()} for details")
 
     def __wait_for_control_socket_alive(self) -> bool:
@@ -226,29 +227,19 @@ class SyslogNg(object):
 
     def __error_handling(self, error_message: str) -> typing.NoReturn:
         self._console_log_reader.dump_stderr()
-        self.__handle_core_file()
+        self.__handle_crash()
         raise Exception(error_message)
 
-    def __handle_core_file(self) -> None:
+    def __handle_crash(self, returncode=None) -> None:
         if not self.is_process_running():
-            core_file_found = False
-            for core_file in Path(".").glob("*core*"):
-                core_file_found = True
+            if returncode is None:
+                if hasattr(self, "_process") and self._process is not None:
+                    returncode = self._process.returncode
+                else:
+                    returncode = self._saved_returncode
+            else:
+                self._saved_returncode = returncode
+            if returncode in [-4, -6, -7, -8, -9, -11]:
                 self._process = None
-
-                core_postfix = "gdb_core_{}".format(get_unique_id())
-                stderr_path = self.instance_paths.get_stderr_path_with_postfix(core_postfix)
-                stdout_path = self.instance_paths.get_stdout_path_with_postfix(core_postfix)
-
-                self._syslog_ng_executor.get_backtrace_from_core(
-                    core_file,
-                    stderr_path,
-                    stdout_path,
-                )
-                core_file.replace(Path(core_file))
-            if core_file_found:
-                raise Exception("syslog-ng core file was found and processed")
-            if self._process.returncode in [-6, -9, -11]:
-                ret_code = self._process.returncode
-                self._process = None
-                raise Exception("syslog-ng process crashed with signal {}".format(ret_code))
+                self._saved_returncode = None
+                assert False, "syslog-ng process crashed with signal {}".format(returncode)
