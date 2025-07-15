@@ -109,33 +109,33 @@ def test_clickhouse_destination_missing_options_db_run(config, syslog_ng, clickh
 
 
 invalid_schema_values = [
-    (''),  # Example: empty schema string
-    (' '),  # Example: whitespace only
-    (' => '),  # Example: only mapping operator
-    ('some random string 1234'),  # Example: some random value
-    ('"id" "String" =>'),  # Example: missing message macro
-    ('"id" "String" $MSG'),  # Example: missing mapping operator
-    ('"id", "String" => $MSG'),  # Example: comma separator
-    ('"id" "String" => $MSG, "id2 id3" "String" => $MSG'),  # Example: second invalid
-    ('id String => $MSG'),  # Example: values without quotes
-    ('"id" "String" => $NotAvailableMacro'),  # Example: not available macro
-    ('"id" "String" => MSG'),  # Example: missing $ in message macro
-    ('"$id" "String" => $MSG'),  # Example: $ in column name
-    ('"$id $id2" "String" => $MSG'),  # Example: $ in column name
-    ('"id" => $MSG'),  # Example: missing type
-    ('"String" => $MSG'),  # Example: missing column name
-    ('"id" "String" => => $MSG'),  # Example: double mapping operator
-    ('"id" "String" => $MSG => $MSG'),  # Example: double mapping operator and message macro
-    ('"id" "UnknownType" => $MSG'),  # Example: invalid type
-    ('"id id2" "String" => $MSG'),  # Example: double column
-    ('"id" "String Integer" => $MSG'),  # Example: double type
-    ('"id" "String" => $MSG $DATE'),  # Example: double message macro
-    ('"event_time" "DateTime" => "$YEAR-$MONTH-$DAY $HOUR:$MIN:$SEC"'),  # Example: valid mapping with DateTime
+    ('', "syslog-ng is not running"),  # Example: empty schema string
+    (' ', "syslog-ng is not running"),  # Example: whitespace only
+    (' => ', "syslog-ng config syntax error"),  # Example: only mapping operator
+    ('some random string 1234', "syslog-ng config syntax error"),  # Example: some random value
+    ('"id" "String" =>', "syslog-ng config syntax error"),  # Example: missing message macro
+    ('"id" "String" $MSG', "syslog-ng config syntax error"),  # Example: missing mapping operator
+    ('"id", "String" => $MSG', "start passed"),  # Example: comma separator
+    ('"id" "String" => $MSG, "id2 id3" "String" => $MSG', "syslog-ng is not running"),  # Example: second invalid, crash
+    ('id String => $MSG', "start passed"),  # Example: values without quotes
+    ('"id" "String" => $NotAvailableMacro', "start passed"),  # Example: not available macro
+    ('"id" "String" => MSG', "start passed"),  # Example: missing $ in message macro
+    ('"$id" "String" => $MSG', "syslog-ng is not running"),  # Example: $ in column name, crash
+    ('"$id $id2" "String" => $MSG', "syslog-ng is not running"),  # Example: $ in column name, crash
+    ('"id" => $MSG', "start passed"),  # Example: missing type
+    ('"String" => $MSG', "start passed"),  # Example: missing column name
+    ('"id" "String" => => $MSG', "syslog-ng config syntax error"),  # Example: double mapping operator
+    ('"id" "String" => $MSG => $MSG', "syslog-ng config syntax error"),  # Example: double mapping operator and message macro
+    ('"id" "UnknownType" => $MSG', "syslog-ng config syntax error"),  # Example: invalid type
+    ('"id id2" "String" => $MSG', "syslog-ng is not running"),  # Example: double column, crash
+    ('"id" "String Integer" => $MSG', "syslog-ng config syntax error"),  # Example: double type
+    ('"id" "String" => $MSG $DATE', "syslog-ng config syntax error"),  # Example: double message macro
+    ('"event_time" "DateTime" => "$YEAR-$MONTH-$DAY $HOUR:$MIN:$SEC"', "start passed"),  # Example: valid mapping with DateTime
 ]
 
 
-@pytest.mark.parametrize("option_value", invalid_schema_values, ids=range(len(invalid_schema_values)))
-def test_clickhouse_destination_invalid_schema_option(testcase_parameters, config, syslog_ng, option_value):
+@pytest.mark.parametrize("option_value, expected_error", invalid_schema_values, ids=range(len(invalid_schema_values)))
+def test_clickhouse_destination_invalid_schema_option(testcase_parameters, config, syslog_ng, option_value, expected_error):
     generator_source = config.create_example_msg_generator_source(num=1)
     clickhouse_options = {
         "database": "default",
@@ -146,14 +146,19 @@ def test_clickhouse_destination_invalid_schema_option(testcase_parameters, confi
     clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
-    syslog_ng.start(config)
+    if expected_error != "start passed":
+        with pytest.raises(Exception) as exec_info:
+            syslog_ng.start(config)
+        assert expected_error in str(exec_info.value)
+    else:
+        syslog_ng.start(config)
 
 
 invalid_protobuf_schema_values = [
     ('', 'syslog-ng config syntax error'),
     (' ', 'syslog-ng config syntax error'),
-    ('"clickhouse.proto" => "$MSG", "$AAA"', 'syslog-ng is not running'),
-    ('"clickhouse.proto" => "$MSG" "$AAA"', 'syslog-ng is not running'),
+    ('"clickhouse.proto" => "$MSG", "$AAA"', 'syslog-ng config syntax error'),
+    ('"clickhouse.proto" => "$MSG" "$AAA"', 'syslog-ng config syntax error'),
     ('"clickhouse.proto" "$MSG" "$AAA"', 'syslog-ng config syntax error'),
     ('=> "$MSG" "$AAA"', 'syslog-ng config syntax error'),
     ('"$MSG" "$AAA"', 'syslog-ng config syntax error'),
