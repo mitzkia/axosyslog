@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class ClickhouseServerExecutor():
     def __init__(self, testcase_parameters) -> None:
         self.process = None
-        self.clickhouse_severs_ports = [8123, 9000, 9004, 9005, 9009]
+        self.clickhouse_severs_ports = [8123, 9000, 9004, 9005, 9009, 9100]
         copy_shared_file(testcase_parameters, "clickhouse_server_config.xml")
         copy_shared_file(testcase_parameters, "clickhouse_users.xml")
 
@@ -56,12 +56,13 @@ class ClickhouseServerExecutor():
         if not self.process:
             raise RuntimeError("Clickhouse server process is not running.")
 
-        connections = psutil.Process(self.process.pid).net_connections(kind='inet')
-        open_ports = [conn.laddr.port for conn in connections if conn.laddr]
-        return sorted(open_ports)
+        connections = psutil.Process(psutil.Process(self.process.pid).children()[0].pid).net_connections(kind='inet')
+        open_ports = sorted(set([conn.laddr.port for conn in connections if conn.laddr]))
+        return open_ports
 
     def wait_for_start(self) -> bool:
-        assert wait_until_true(lambda: self.get_open_ports() == self.clickhouse_severs_ports)
+        assert wait_until_true(lambda: len(psutil.Process(self.process.pid).children()) > 0)
+        assert wait_until_true(lambda: self.get_open_ports() == self.clickhouse_severs_ports), "Actual ports: {}, expected: {}".format(self.get_open_ports(), self.clickhouse_severs_ports)
 
     def wait_for_stop(self) -> bool:
         assert wait_until_true(lambda: self.get_open_ports() == [])
