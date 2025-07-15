@@ -22,7 +22,9 @@
 # COPYING for details.
 #
 #############################################################################
+import os
 import shlex
+import stat
 import typing
 from pathlib import Path
 from subprocess import Popen
@@ -97,6 +99,31 @@ class SyslogNgLocalExecutor(SyslogNgExecutor):
             command=["xterm", "-fa", "Monospace", "-fs", "18", "-e", shlex.join(gdb_command_args)],
             stdout_path="/dev/null",
             stderr_path="/dev/null",
+        )
+
+    def run_process_with_gdb_for_bt(
+        self,
+        start_params: SyslogNgStartParams,
+        stderr_path: Path,
+        stdout_path: Path,
+    ) -> Popen:
+        gdb_exec_file_content = f"""#!/bin/bash
+    exec gdb <<EOF
+    file {self.__syslog_ng_binary_path}
+    run {shlex.join(start_params.format())}
+    bt full
+    quit
+    EOF"""
+        gdb_exec_file_name = "gdb_exec.sh"
+        with open(gdb_exec_file_name, "w") as gdb_exec_file:
+            gdb_exec_file.write(gdb_exec_file_content)
+            st = os.stat(gdb_exec_file_name)
+            os.chmod(gdb_exec_file_name, st.st_mode | stat.S_IEXEC)
+
+        return self.__command_executor.run(
+            command=[f"./{gdb_exec_file_name}"],
+            stdout_path="gdb_stdout.log",
+            stderr_path="gdb_stderr.log",
         )
 
     def run_process_with_strace(
