@@ -71,12 +71,15 @@ class ClickhouseServerExecutor():
 class ClickhouseClient():
     def __init__(self) -> None:
         self.table_name = None
+        self.host = 'localhost'
+        self.username = 'default'
+        self.password = 'password'
 
     def create_table(self, table_name: str, table_columns_and_types: list[tuple[str, str]] = None) -> None:
         prim_key_col_name = table_columns_and_types[0][0]
         self.table_name = table_name
 
-        client = clickhouse_connect.get_client(host='localhost', username='default')
+        client = clickhouse_connect.get_client(host=self.host, username=self.username, password=self.password)
         columns_definition = ", ".join([f'"{col}" {typ}' for col, typ in table_columns_and_types])
         print("Columns definition:", columns_definition)
         if "TIME" in columns_definition:
@@ -91,13 +94,13 @@ class ClickhouseClient():
 
     def delete_table(self) -> None:
         if self.table_name:
-            client = clickhouse_connect.get_client(host='localhost', username='default')
+            client = clickhouse_connect.get_client(host=self.host, username=self.username, password=self.password)
             client.command(f'DROP TABLE IF EXISTS {self.table_name};')
             client.close()
             logger.info(f"Table deleted: {self.table_name}")
 
     def select_all_from_table(self, table_name: str) -> list:
-        client = clickhouse_connect.get_client(host='localhost', username='default')
+        client = clickhouse_connect.get_client(host=self.host, username=self.username, password=self.password)
         query = f"SELECT * FROM {table_name};"
         query_res = client.command(query)
         client.close()
@@ -105,7 +108,7 @@ class ClickhouseClient():
         return query_res
 
     def run_query(self, query: str) -> None:
-        client = clickhouse_connect.get_client(host='localhost', username='default')
+        client = clickhouse_connect.get_client(host=self.host, username=self.username, password=self.password)
         query_result = client.command(query)
         client.close()
         return query_result

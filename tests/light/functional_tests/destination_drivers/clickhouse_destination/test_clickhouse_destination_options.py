@@ -24,11 +24,19 @@ import uuid
 
 import pytest
 
+clickhouse_valid_options = {
+    "database": "default",
+    "table": "test_table",
+    "user": "default",
+    "password": "'password'",
+    "schema": '"message" "String" => "$MSG"',
+}
+
 
 def test_clickhouse_destination_valid_options_db_run(config, syslog_ng, clickhouse_server, clickhouse_client):
     custom_input_msg = f"test message {str(uuid.uuid4())}"
     generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
-    clickhouse_destination = config.create_clickhouse_destination(database="default", table="test_table", user="default", schema='"message" "String" => "$MSG"')
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
     clickhouse_server.start()
@@ -45,7 +53,7 @@ def test_clickhouse_destination_valid_options_db_run(config, syslog_ng, clickhou
 def test_clickhouse_destination_valid_options_db_not_run(config, syslog_ng):
     custom_input_msg = f"test message {str(uuid.uuid4())}"
     generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
-    clickhouse_destination = config.create_clickhouse_destination(database="default", table="test_table", user="default", schema='"message" "String" => "$MSG"')
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
     syslog_ng.start(config)
@@ -57,16 +65,17 @@ def test_clickhouse_destination_valid_options_db_not_run(config, syslog_ng):
 
 
 @pytest.mark.parametrize(
-    "ch_database, ch_table, ch_user", [
-        ("invalid_dababase", "test_table", "default"),
-        ("default", "invalid_table", "default"),
-        ("default", "test_table", "invalid_user"),
-    ], ids=["invalid_database", "invalid_table", "invalid_user"],
+    "ch_database, ch_table, ch_user, ch_password", [
+        ("invalid_dababase", "test_table", "default", "'password'"),
+        ("default", "invalid_table", "default", "'password'"),
+        ("default", "test_table", "invalid_user", "'password'"),
+        ("default", "test_table", "default", "'invalid_password'"),
+    ], ids=["invalid_database", "invalid_table", "invalid_user", "invalid_password"],
 )
-def test_clickhouse_destination_invalid_options_db_run(config, syslog_ng, clickhouse_server, clickhouse_client, ch_database, ch_table, ch_user):
+def test_clickhouse_destination_invalid_options_db_run(config, syslog_ng, clickhouse_server, clickhouse_client, ch_database, ch_table, ch_user, ch_password):
     custom_input_msg = f"test message {str(uuid.uuid4())}"
     generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
-    clickhouse_destination = config.create_clickhouse_destination(database=ch_database, table=ch_table, user=ch_user, schema='"message" "String" => "$MSG"')
+    clickhouse_destination = config.create_clickhouse_destination(database=ch_database, table=ch_table, user=ch_user, password=ch_password, schema='"message" "String" => "$MSG"')
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
     clickhouse_server.start()
