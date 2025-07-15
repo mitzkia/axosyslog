@@ -64,6 +64,51 @@ def test_clickhouse_destination_valid_options_db_not_run(config, syslog_ng):
     assert syslog_ng.wait_for_message_in_console_log("ClickHouse server responded with a temporary error status code") != []
 
 
+def test_clickhouse_destination_valid_url_option_db_run(config, syslog_ng, clickhouse_server, clickhouse_client):
+    custom_input_msg = f"test message {str(uuid.uuid4())}"
+    generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
+    clickhouse_valid_options["url"] = "'localhost:9100'"
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    config.create_logpath(statements=[generator_source, clickhouse_destination])
+
+    clickhouse_server.start()
+    clickhouse_client.create_table("test_table", [("message", "String")])
+
+    syslog_ng.start(config)
+
+    assert clickhouse_destination.get_stats()["written"] >= 1
+
+    db_logs = clickhouse_destination.read_logs()
+    assert db_logs == custom_input_msg
+
+
+invalid_url_values = [
+    ("'localhost'"),  # Missing port
+    ("'invalid-domain:1234'"),  # Invalid domain
+    ("'localhost:9100,localhost:9000'"),  # Multiple URLs not supported
+    ("'@#@!#$RFSDSVCWRF SFsd'"),  # Garbage string
+    ("' '"),  # Whitespace only
+    ("'127.0.0.1'"),  # IPv4 address without port
+    ("'::1'"),  # IPv6 address without port
+]
+
+
+@pytest.mark.parametrize("invalid_option_value", invalid_url_values, ids=range(len(invalid_url_values)))
+def test_clickhouse_destination_invalid_url_option_db_run(config, syslog_ng, clickhouse_server, clickhouse_client, invalid_option_value):
+    custom_input_msg = f"test message {str(uuid.uuid4())}"
+    generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
+    clickhouse_valid_options["url"] = invalid_option_value
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    config.create_logpath(statements=[generator_source, clickhouse_destination])
+
+    clickhouse_server.start()
+    clickhouse_client.create_table("test_table", [("message", "String")])
+
+    syslog_ng.start(config)
+
+    assert clickhouse_destination.get_stats()["written"] == 0
+
+
 @pytest.mark.parametrize(
     "ch_database, ch_table, ch_user, ch_password", [
         ("invalid_dababase", "test_table", "default", "'password'"),
