@@ -199,6 +199,7 @@ def test_clickhouse_destination_basic_types(testcase_parameters, config, syslog_
         database="default",
         table=table_name,
         user="default",
+        password="'password'",
         schema=build_clickhouse_schema_expression(),
     )
     config.create_logpath(statements=[generator_source, filterx, clickhouse_destination])
@@ -254,6 +255,8 @@ def test_clickhouse_destination_nested_types(testcase_parameters, config, syslog
         database="default",
         table=table_name,
         user="default",
+        password="'password'",
+        server_side_schema="'clickhouse:TestProto'",
         proto_var="$protobuf_message",
     )
     config.create_logpath(statements=[generator_source, filterx, clickhouse_destination])
@@ -275,5 +278,7 @@ def test_clickhouse_destination_nested_types(testcase_parameters, config, syslog
 
     query_res = clickhouse_client.run_query(f"SELECT * FROM {table_name}")
     print(f"Query result: {query_res}")
+
+    assert clickhouse_destination.get_stats()["written"] == 1
 
     # assert query_res == ["<34>Oct 11 22:14:15 mymachine su: \\'su root\\' failed for lonvick on /dev/pts/8", '365', "{'host':'micek-ThinkPad-T14-Gen-4','time':'1751891051.000000','date':'2025 Jul  7 12:24:11'}", '[\'foo\',\'bar\',\'baz\',\'{"map":{"key":"value"}}\']', "('value11','value21','')", "[('value12','value22',''),('value33','value43','')]"]
