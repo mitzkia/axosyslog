@@ -68,8 +68,9 @@ def test_clickhouse_destination_valid_options_db_not_run(config, syslog_ng):
 def test_clickhouse_destination_valid_url_option_db_run(config, syslog_ng, clickhouse_server, clickhouse_client):
     custom_input_msg = f"test message {str(uuid.uuid4())}"
     generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
-    clickhouse_valid_options["url"] = "'127.0.0.1:9100'"
-    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    clickhouse_options = clickhouse_valid_options.copy()
+    clickhouse_options.update({"url": "'127.0.0.1:9100'"})
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
     clickhouse_server.start()
@@ -98,8 +99,9 @@ invalid_url_values = [
 def test_clickhouse_destination_invalid_url_option_db_run(config, syslog_ng, clickhouse_server, clickhouse_client, invalid_option_value):
     custom_input_msg = f"test message {str(uuid.uuid4())}"
     generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
-    clickhouse_valid_options["url"] = invalid_option_value
-    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    clickhouse_options = clickhouse_valid_options.copy()
+    clickhouse_options.update({"url": invalid_option_value})
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
     clickhouse_server.start()
@@ -147,12 +149,12 @@ def test_clickhouse_destination_missing_options_db_run(config, syslog_ng, clickh
     generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
     clickhouse_options = {}
     if ch_database is not None:
-        clickhouse_options["database"] = ch_database
+        clickhouse_options.update({"database": ch_database})
     if ch_table is not None:
-        clickhouse_options["table"] = ch_table
+        clickhouse_options.update({"table": ch_table})
     if ch_user is not None:
-        clickhouse_options["user"] = ch_user
-    clickhouse_options["schema"] = '"message" "String" => "$MSG"'
+        clickhouse_options.update({"user": ch_user})
+    clickhouse_options.update({"schema": '"message" "String" => "$MSG"'})
 
     clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
@@ -197,7 +199,7 @@ def test_clickhouse_destination_invalid_schema_option(testcase_parameters, confi
         "table": "test_table",
         "user": "default",
     }
-    clickhouse_options["schema"] = option_value
+    clickhouse_options.update({"schema": option_value})
     clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
@@ -223,8 +225,9 @@ invalid_protobuf_schema_values = [
 @pytest.mark.parametrize("invalid_protobuf_schema_value, expected_error", invalid_protobuf_schema_values, ids=range(len(invalid_protobuf_schema_values)))
 def test_clickhouse_destination_invalid_protobuf_schema_option(testcase_parameters, config, syslog_ng, invalid_protobuf_schema_value, expected_error):
     generator_source = config.create_example_msg_generator_source(num=1)
-    clickhouse_valid_options["protobuf_schema"] = invalid_protobuf_schema_value
-    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    clickhouse_options = clickhouse_valid_options.copy()
+    clickhouse_options.update({"protobuf_schema": invalid_protobuf_schema_value})
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
     with pytest.raises(Exception) as exec_info:
@@ -244,8 +247,9 @@ invalid_server_side_schema_values = [
 @pytest.mark.parametrize("invalid_server_side_schema_value, expected_error", invalid_server_side_schema_values, ids=range(len(invalid_server_side_schema_values)))
 def test_clickhouse_destination_invalid_server_side_schema_option(testcase_parameters, config, syslog_ng, clickhouse_server, clickhouse_client, invalid_server_side_schema_value, expected_error):
     generator_source = config.create_example_msg_generator_source(num=1)
-    clickhouse_valid_options["server_side_schema"] = invalid_server_side_schema_value
-    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    clickhouse_options = clickhouse_valid_options.copy()
+    clickhouse_options.update({"server_side_schema": invalid_server_side_schema_value})
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
     clickhouse_server.start()
@@ -292,9 +296,10 @@ def test_clickhouse_destination_invalid_proto_var_option(testcase_parameters, co
         $invalid_proto_var_value = %s;
     ''' % (invalid_proto_var_value),
     )
-    clickhouse_valid_options["proto_var"] = "$invalid_proto_var_value"
-    clickhouse_valid_options.pop('schema', None)
-    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    clickhouse_options = clickhouse_valid_options.copy()
+    clickhouse_options.update({"proto_var": "$invalid_proto_var_value"})
+    clickhouse_options.pop('schema', None)
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
     config.create_logpath(statements=[generator_source, filterx, clickhouse_destination])
 
     copy_shared_file(testcase_parameters, "clickhouse.proto")
