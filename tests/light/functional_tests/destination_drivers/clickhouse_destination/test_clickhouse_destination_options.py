@@ -23,6 +23,7 @@
 import uuid
 
 import pytest
+from axosyslog_light.common.file import copy_shared_file
 
 clickhouse_valid_options = {
     "database": "default",
@@ -67,7 +68,7 @@ def test_clickhouse_destination_valid_options_db_not_run(config, syslog_ng):
 def test_clickhouse_destination_valid_url_option_db_run(config, syslog_ng, clickhouse_server, clickhouse_client):
     custom_input_msg = f"test message {str(uuid.uuid4())}"
     generator_source = config.create_example_msg_generator_source(num=1, template=f'"{custom_input_msg}"')
-    clickhouse_valid_options["url"] = "'localhost:9100'"
+    clickhouse_valid_options["url"] = "'127.0.0.1:9100'"
     clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
@@ -219,18 +220,96 @@ invalid_protobuf_schema_values = [
 ]
 
 
-@pytest.mark.parametrize("option_value, expected_error", invalid_protobuf_schema_values, ids=range(len(invalid_protobuf_schema_values)))
-def test_clickhouse_destination_invalid_protobuf_schema_option(testcase_parameters, config, syslog_ng, option_value, expected_error):
+@pytest.mark.parametrize("invalid_protobuf_schema_value, expected_error", invalid_protobuf_schema_values, ids=range(len(invalid_protobuf_schema_values)))
+def test_clickhouse_destination_invalid_protobuf_schema_option(testcase_parameters, config, syslog_ng, invalid_protobuf_schema_value, expected_error):
     generator_source = config.create_example_msg_generator_source(num=1)
-    clickhouse_options = {
-        "database": "default",
-        "table": "test_table",
-        "user": "default",
-    }
-    clickhouse_options["protobuf_schema"] = option_value
-    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
+    clickhouse_valid_options["protobuf_schema"] = invalid_protobuf_schema_value
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
     config.create_logpath(statements=[generator_source, clickhouse_destination])
 
     with pytest.raises(Exception) as exec_info:
         syslog_ng.start(config)
     assert expected_error in str(exec_info.value)
+
+
+invalid_server_side_schema_values = [
+    ('', 'syslog-ng config syntax error'),
+    (' ', 'syslog-ng config syntax error'),
+    ('"invalid:invalid"', ''),
+    ('"invalid.invalid"', ''),
+    ('"invalid@invalid"', ''),
+]
+
+
+@pytest.mark.parametrize("invalid_server_side_schema_value, expected_error", invalid_server_side_schema_values, ids=range(len(invalid_server_side_schema_values)))
+def test_clickhouse_destination_invalid_server_side_schema_option(testcase_parameters, config, syslog_ng, clickhouse_server, clickhouse_client, invalid_server_side_schema_value, expected_error):
+    generator_source = config.create_example_msg_generator_source(num=1)
+    clickhouse_valid_options["server_side_schema"] = invalid_server_side_schema_value
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    config.create_logpath(statements=[generator_source, clickhouse_destination])
+
+    clickhouse_server.start()
+    clickhouse_client.create_table("test_table", [("message", "String")])
+
+    if expected_error:
+        with pytest.raises(Exception) as exec_info:
+            syslog_ng.start(config)
+        assert expected_error in str(exec_info.value)
+    else:
+        syslog_ng.start(config)
+        assert clickhouse_destination.get_stats() == {'eps_last_1h': 0, 'eps_since_start': 0, 'processed': 1, 'msg_size_avg': 27, 'eps_last_24h': 0, 'batch_size_max': 0, 'dropped': 1, 'queued': 0, 'written': 0, 'memory_usage': 0, 'batch_size_avg': 0, 'msg_size_max': 27}
+
+
+invalid_proto_var_values = [
+    ('protobuf_message({"": ""}, schema_file="clickhouse.proto")', 'filterx error'),  # unknown field name
+    ('protobuf_message({"name": $AAA}, schema_file="clickhouse.proto")', 'filterx error'),  # Variable is unset
+    ('protobuf_message({"name": None}, schema_file="clickhouse.proto")', 'filterx error'),  # No such variable
+    ('protobuf_message({"name": 123}, schema_file="clickhouse.proto")', 'filterx error'),  # Type for field name is unsupported
+    ('protobuf_message', 'filterx error'),  # No such variable
+    # ##############
+    ('protobuf_message({"name": "fsdfsdf}, schema_file="clickhouse.proto")', 'syntax error'),
+    ('protobuf_message()', 'syntax error'),
+    ('protobuf_message({"name": "value"}, schema_file="")', "syntax error"),
+    ('protobuf_message({"name": "value"}, schema_file="clickhouse.proto", extra_arg=1)', 'syntax error'),
+    ('', 'syntax error'),
+    # #############
+    ('123', 'LogMessage type is not protobuf'),
+    ('{}', 'LogMessage type is not protobuf'),
+    ('" "', 'LogMessage type is not protobuf'),
+    ('0x00', 'LogMessage type is not protobuf'),
+]
+
+
+@pytest.mark.parametrize("invalid_proto_var_value, expected_error", invalid_proto_var_values, ids=range(len(invalid_proto_var_values)))
+def test_clickhouse_destination_invalid_proto_var_option(testcase_parameters, config, syslog_ng, clickhouse_server, clickhouse_client, invalid_proto_var_value, expected_error):
+    generator_source = config.create_example_msg_generator_source(
+        num=1,
+        template=config.stringify("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8"),
+    )
+
+    filterx = config.create_filterx(
+        '''
+        $invalid_proto_var_value = %s;
+    ''' % (invalid_proto_var_value),
+    )
+    clickhouse_valid_options["proto_var"] = "$invalid_proto_var_value"
+    clickhouse_valid_options.pop('schema', None)
+    clickhouse_destination = config.create_clickhouse_destination(**clickhouse_valid_options)
+    config.create_logpath(statements=[generator_source, filterx, clickhouse_destination])
+
+    copy_shared_file(testcase_parameters, "clickhouse.proto")
+    clickhouse_server.start()
+    clickhouse_client.create_table("test_table", [("message", "String")])
+
+    if expected_error == "filterx error":
+        syslog_ng.start(config)
+        assert clickhouse_destination.get_stats()["written"] == 0
+        assert syslog_ng.wait_for_message_in_console_log("FILTERX ERROR") != []
+    elif expected_error == "syntax error":
+        with pytest.raises(Exception) as exec_info:
+            syslog_ng.start(config)
+        assert "syslog-ng config syntax error" in str(exec_info.value)
+    elif expected_error == "LogMessage type is not protobuf":
+        syslog_ng.start(config)
+        assert syslog_ng.wait_for_message_in_console_log("LogMessage type is not protobuf") != []
+        assert clickhouse_destination.get_stats()["written"] == 0

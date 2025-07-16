@@ -81,16 +81,13 @@ class ClickhouseClient():
 
         client = clickhouse_connect.get_client(host=self.host, username=self.username, password=self.password)
         columns_definition = ", ".join([f'"{col}" {typ}' for col, typ in table_columns_and_types])
-        print("Columns definition:", columns_definition)
         if "TIME" in columns_definition:
             enable_time_setting = "SET enable_time_time64_type = 1;"
             client.command(enable_time_setting)
         create_table_query = f"CREATE TABLE {table_name} ({columns_definition}) ENGINE MergeTree() PRIMARY KEY (%s);" % prim_key_col_name
-        print("Create table query:", create_table_query)
         client.command(create_table_query)
         client.close()
-        logger.info(create_table_query)
-        logger.info(f"Table created: {table_name} with columns {columns_definition}")
+        logger.info(f"Table created: {table_name} with {create_table_query}")
 
     def delete_table(self) -> None:
         if self.table_name:

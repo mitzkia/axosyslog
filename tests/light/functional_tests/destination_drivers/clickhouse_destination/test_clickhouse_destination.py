@@ -20,6 +20,7 @@
 # COPYING for details.
 #
 #############################################################################
+import logging
 import re
 import string
 
@@ -28,6 +29,8 @@ from axosyslog_light.common.file import copy_shared_file
 # input_string = string.ascii_letters + string.digits + "{}[]()<>'\"/\\,.-=+_!@#$%^&*``~|?:; \n\t\r" + "\u00A0"  + "Árvíztűrő tükörfúrógép"
 # input_string = string.ascii_letters + string.digits + "Árvíztűrő tükörfúrógép" + "\u00A0" + ".,;:!?@#$%^&*_+-=~|[]{}()<>``\n\t\r"
 input_string = string.ascii_letters + string.digits + "Árvíztűrő tükörfúrógép" + ".,;:!?@#$%^&*_+-=~|[]{}()<>``\n\t\r"
+
+logger = logging.getLogger(__name__)
 
 
 clickhouse_data_type_values = [
@@ -277,8 +280,8 @@ def test_clickhouse_destination_nested_types(testcase_parameters, config, syslog
     syslog_ng.start(config)
 
     query_res = clickhouse_client.run_query(f"SELECT * FROM {table_name}")
-    print(f"Query result: {query_res}")
+    logger.info(f"Query result: {query_res}")
 
     assert clickhouse_destination.get_stats()["written"] == 1
 
-    # assert query_res == ["<34>Oct 11 22:14:15 mymachine su: \\'su root\\' failed for lonvick on /dev/pts/8", '365', "{'host':'micek-ThinkPad-T14-Gen-4','time':'1751891051.000000','date':'2025 Jul  7 12:24:11'}", '[\'foo\',\'bar\',\'baz\',\'{"map":{"key":"value"}}\']', "('value11','value21','')", "[('value12','value22',''),('value33','value43','')]"]
+    assert query_res == ["<34>Oct 11 22:14:15 mymachine su: \\'su root\\' failed for lonvick on /dev/pts/8", '432', "{'host':'micek-ThinkPad-T14-Gen-4','time':'1752588976.000000','date':'2025 Jul 15 14:16:16'}", '[\'foo\',\'bar\',\'baz\',\'{"map":{"key":"value"}}\']', "('value11','value21','')", "[('value12','value22',''),('value33','value43','')]"]
