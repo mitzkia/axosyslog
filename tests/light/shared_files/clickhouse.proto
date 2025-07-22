@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package TestProto;
+
+message TestProto {
+    string name = 1;
+    int32 id = 2;
+    map<string, string> foobar = 3;
+    repeated string arr = 4;
+    nested sub = 5;
+    repeated nested repsub = 6;
+    message nested {
+        string foo = 1;
+        string bar = 2;
+        string baz = 3;
+    }
+}

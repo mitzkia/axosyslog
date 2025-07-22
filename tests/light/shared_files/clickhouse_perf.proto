@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package TestPerfProto;
+
+message TestPerfProto {
+    string data1 = 1;
+    string data2 = 2;
+    string data3 = 3;
+    string data4 = 4;
+    map<string, string> data5 = 5;
+    map<string, string> data6 = 6;
+    map<string, string> data7 = 7;
+    map<string, string> data8 = 8;
+}
