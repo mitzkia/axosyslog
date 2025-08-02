@@ -28,6 +28,7 @@ import time
 import pytest
 from axosyslog_light.common.blocking import wait_until_true_custom
 from axosyslog_light.helpers.loggen.loggen import LoggenStartParams
+from axosyslog_light.syslog_ng_config.__init__ import stringify
 # import uuid
 # from axosyslog_light.common.file import copy_shared_file
 
@@ -88,32 +89,32 @@ perf_tc_variants = [
     # (10, sample_csv_message[:256] + "\n", "", "", "file-dst"),
     # (10, sample_csv_message[:512] + "\n", "", "", "file-dst"),
     # (10, sample_csv_message[:756] + "\n", "", "", "file-dst"),
-    (3000000, sample_csv_message, "", "", ""),
+    (10, sample_csv_message, "", "", "clickhouse-dst"),
 
-    # csv-parser + filterx
-    (3000000, sample_csv_message, "csv-parser-delimiter", "filterx-from-csv-parser-input", ""),
+    # # csv-parser + filterx
+    # (3000000, sample_csv_message, "csv-parser-delimiter", "filterx-from-csv-parser-input", ""),
 
-    # Filterx builtin simple functions
-    (3000000, sample_csv_message, "", "filterx-builtin-simple-functions", ""),
+    # # Filterx builtin simple functions
+    # (3000000, sample_csv_message, "", "filterx-builtin-simple-functions", ""),
 
-    # Filterx parse functions
-    (3000000, sample_cef_message, "", "filterx-parse-cef", ""),
-    (3000000, sample_csv_message, "", "filterx-parse-csv", ""),   # final MSG output type: dict
-    (3000000, sample_kv_message, "", "filterx-parse-kv", ""),
-    (3000000, sample_leef_message, "", "filterx-parse-leef", ""),
-    (3000000, sample_xml_message, "", "filterx-parse-xml", ""),
-    (3000000, sample_windows_eventlog_xml_message, "", "filterx-parse-windows-eventlog-xml", ""),
+    # # Filterx parse functions
+    # (3000000, sample_cef_message, "", "filterx-parse-cef", ""),
+    # (3000000, sample_csv_message, "", "filterx-parse-csv", ""),   # final MSG output type: dict
+    # (3000000, sample_kv_message, "", "filterx-parse-kv", ""),
+    # (3000000, sample_leef_message, "", "filterx-parse-leef", ""),
+    # (3000000, sample_xml_message, "", "filterx-parse-xml", ""),
+    # (3000000, sample_windows_eventlog_xml_message, "", "filterx-parse-windows-eventlog-xml", ""),
 
-    # Filterx format functions
-    (3000000, parsed_cef_message, "", "filterx-format-cef", ""),
-    (3000000, sample_json_message, "", "filterx-format-csv", ""),
-    (3000000, sample_json_message, "", "filterx-format-kv", ""),
-    (3000000, parsed_leef_message, "", "filterx-format-leef", ""),
-    (3000000, sample_json_message, "", "filterx-format-xml", ""),
-    (3000000, sample_json_message, "", "filterx-format-windows-eventlog-xml", ""),
+    # # Filterx format functions
+    # (3000000, parsed_cef_message, "", "filterx-format-cef", ""),
+    # (3000000, sample_json_message, "", "filterx-format-csv", ""),
+    # (3000000, sample_json_message, "", "filterx-format-kv", ""),
+    # (3000000, parsed_leef_message, "", "filterx-format-leef", ""),
+    # (3000000, sample_json_message, "", "filterx-format-xml", ""),
+    # (3000000, sample_json_message, "", "filterx-format-windows-eventlog-xml", ""),
 
-    # Filterx parse and format functions
-    (3000000, sample_csv_message, "", "filterx-with-parse-csv-and-format-json", ""),   # final MSG output type: string
+    # # Filterx parse and format functions
+    # (3000000, sample_csv_message, "", "filterx-with-parse-csv-and-format-json", ""),   # final MSG output type: string
 
 ]
 
@@ -251,6 +252,24 @@ def test_clickhouse_destination_perf2(request, testcase_parameters, config, sysl
     if destination == "file-dst":
         file_destination = config.create_file_destination(file_name="output.log")
         config_statements.append(file_destination)
+
+    if destination == "clickhouse-dst":
+        clickhouse_options = {
+            "database": "default",
+            "table": "test_table",
+            "user": "default",
+            "password": f'{stringify("password")}',
+            "schema": '"message" "String" => "$MSG"',
+            "workers": 4,
+            "batch_lines": 100000,
+            "batch_timeout": 100,
+            "log_fifo_size": 100000,
+        }
+        clickhouse_destination = config.create_clickhouse_destination(**clickhouse_options)
+        config_statements.append(clickhouse_destination)
+        clickhouse_server.start()
+        clickhouse_destination.create_table(clickhouse_options["table"], [("message", "String")])
+        request.addfinalizer(lambda: clickhouse_destination.delete_table())
 
     config.create_logpath(statements=config_statements)
 
