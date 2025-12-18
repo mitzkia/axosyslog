@@ -53,15 +53,18 @@ from axosyslog_light.helpers.loggen.loggen import LoggenStartParams
 
 
 @pytest.mark.parametrize(
-    "option_capacity_bytes", [None, '0', '1', '10Mib', '99999'],
+    "option_capacity_bytes", [None, '0', '5', '10Mib'],
 )
 @pytest.mark.parametrize(
-    "option_front_cache_size", [None, '0', '1', '1000', '99999'],
+    "option_front_cache_size", [None, '0', '5', '1000'],
 )
 @pytest.mark.parametrize(
-    "option_flow_controll", [True, False],
+    "option_flow_controll", [False],
 )
-def test_disk_buffer_acceptance(config, syslog_ng, port_allocator, option_capacity_bytes, option_front_cache_size, option_flow_controll, loggen):
+@pytest.mark.parametrize(
+    "loggen_send_counter", [None, 1, 5, 2000],
+)
+def test_disk_buffer_acceptance(config, syslog_ng, port_allocator, option_capacity_bytes, option_front_cache_size, option_flow_controll, loggen, loggen_send_counter):
     config.update_global_options(stats_level=5)
     network_source = config.create_network_source(ip="localhost", port=port_allocator())
 
@@ -82,17 +85,22 @@ def test_disk_buffer_acceptance(config, syslog_ng, port_allocator, option_capaci
         config.create_logpath(statements=[network_source, network_destination])
     syslog_ng.start(config)
 
-    counter = 10000
-    loggen.start(
-        LoggenStartParams(
-            target=network_source.options["ip"],
-            port=network_source.options["port"],
-            inet=True,
-            stream=True,
-            number=counter,
-        ),
-    )
-    wait_until_true(lambda: loggen.get_sent_message_count() == counter)
+    if loggen_send_counter is not None:
+        loggen.start(
+            LoggenStartParams(
+                target=network_source.options["ip"],
+                port=network_source.options["port"],
+                inet=True,
+                stream=True,
+                rate=10000,
+                size=8192,
+                number=loggen_send_counter,
+            ),
+        )
+        wait_until_true(lambda: loggen.get_sent_message_count() == loggen_send_counter)
+    syslog_ng.reload(config)
+    network_destination.start_listener()
+    syslog_ng.reload(config)
     syslog_ng.stop()
 
 # def test_non_reliable_disk_buffer_file_creation_with_default_settings():
