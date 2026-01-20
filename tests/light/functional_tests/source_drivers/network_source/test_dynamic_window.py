@@ -21,46 +21,106 @@
 # COPYING for details.
 #
 #############################################################################
+import pytest
 from axosyslog_light.common.blocking import wait_until_true
 from axosyslog_light.helpers.loggen.loggen import LoggenStartParams
 
 NUMBER_OF_MESSAGES = 100000
 
+# mikor mennyi uzenetet lehet bekuldeni ha a dst nem el
+# menet kozben mehetnek a reload-ok
+# menet kozben megprobalhatjuk ki-be kapcsolni a dst-t
+# mi van ha tobb source is hasznalja a dynamic window-t egyszerre
+# loggen: active connections = 1 -tol 20-ig + number 1000 - 20000+ ig
+# menet kozben nezzunk stats-okat
+# flow-control be/ki
+# source keep_alive be/ki
+# 1,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000
+# 2,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000, dynamic_window_size = 0
+# 3,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000, dynamic_window_size = 10
+# 4,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000, dynamic_window_size = 1000
+# 5,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000, dynamic_window_size = 20000
+# a lenti msg_trace() es msg_info() logokat kikenyszeriteni
 
-def test_dynamic_window(config, syslog_ng, port_allocator, loggen, syslog_ng_ctl):
-    server_port = port_allocator()
-    # client_port = port_allocator()
+# def test_dynamic_window(config, syslog_ng, port_allocator, loggen, syslog_ng_ctl):
+#     server_port = port_allocator()
+#     config.update_global_options(stats_level=5)
+#     network_source = config.create_network_source(ip="localhost", port=server_port, log_iw_size=100000, dynamic_window_size=100000, dynamic_window_stats_freq=1, dynamic_window_realloc_ticks=10, max_connections=100, keep_alive=True)
+
+#     file_destination = config.create_file_destination(file_name="output.txt")
+#     config.create_logpath(statements=[network_source, file_destination])
+
+#     syslog_ng.start(config)
+
+
+#     loggen.start(
+#         LoggenStartParams(
+#             target=network_source.options["ip"],
+#             port=network_source.options["port"],
+#             inet=True,
+#             rate=100000,
+#             active_connections=5,
+#             reconnect=True,
+#             interval=5,
+#             number=NUMBER_OF_MESSAGES,
+#         ),
+#     )
+#     wait_until_true(lambda: loggen.get_sent_message_count() == 5 * NUMBER_OF_MESSAGES)
+#     print(syslog_ng_ctl.stats())
+#     print(syslog_ng_ctl.stats_prometheus())
+
+#     import time
+#     time.sleep(5)
+#     print(syslog_ng_ctl.stats())
+#     print(syslog_ng_ctl.stats_prometheus())
+
+# 1,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000
+# 2,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000, dynamic_window_size = 0
+# 3,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000, dynamic_window_size = 10
+# 4,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000, dynamic_window_size = 1000
+# 5,  max_connections = 20, log_iw_size = 10000, log_fetch_limit = 1000, dynamic_window_size = 20000
+
+
+@pytest.mark.parametrize(
+    "log_iw_size, log_fetch_limit, dynamic_window_size, loggen_msg_counter", [
+        # (10000, 1000, None),
+        (10000, 1000, 0, 1100),
+        (10000, 1000, 10, 1100),
+        (10000, 1000, 1000, 3000),
+        (10000, 1000, 2000, 3000),
+    ],
+)
+def test_dynamic_window_placeholder(config, syslog_ng, port_allocator, loggen, syslog_ng_ctl, log_iw_size, log_fetch_limit, dynamic_window_size, loggen_msg_counter):
     config.update_global_options(stats_level=5)
-    network_source = config.create_network_source(ip="localhost", port=server_port, log_iw_size=100000, dynamic_window_size=100000, dynamic_window_stats_freq=1, dynamic_window_realloc_ticks=10, max_connections=100, keep_alive=True)
-
-    file_destination = config.create_file_destination(file_name="output.txt")
-    config.create_logpath(statements=[network_source, file_destination])
-
+    network_source = config.create_network_source(
+        ip="localhost",
+        port=port_allocator(),
+        log_iw_size=log_iw_size,
+        log_fetch_limit=log_fetch_limit,
+        dynamic_window_size=dynamic_window_size,
+        # dynamic_window_stats_freq=1,
+        # dynamic_window_realloc_ticks=10,
+        max_connections=10,
+        keep_alive="yes",
+    )
+    network_destination = config.create_network_destination(ip="localhost", port=port_allocator())
+    config.create_logpath(statements=[network_source, network_destination], flags="flow-control")
     syslog_ng.start(config)
-
-    # source.write_log("almafa", client_port=client_port)
-
     loggen.start(
         LoggenStartParams(
             target=network_source.options["ip"],
             port=network_source.options["port"],
             inet=True,
-            rate=100000,
-            active_connections=5,
-            reconnect=True,
-            interval=5,
-            number=NUMBER_OF_MESSAGES,
+            rate=10000,
+            active_connections=1,
+            number=loggen_msg_counter,
         ),
     )
-    wait_until_true(lambda: loggen.get_sent_message_count() == 5 * NUMBER_OF_MESSAGES)
+    wait_until_true(lambda: loggen.get_sent_message_count() == loggen_msg_counter)
     print(syslog_ng_ctl.stats())
     print(syslog_ng_ctl.stats_prometheus())
 
-    import time
-    time.sleep(5)
-    print(syslog_ng_ctl.stats())
-    print(syslog_ng_ctl.stats_prometheus())
-
+    syslog_ng.stop()
 
 # log {
 #   source {
