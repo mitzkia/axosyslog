@@ -111,7 +111,21 @@ def test_default_initial_window(config, syslog_ng, port_allocator, loggen):
 
     fill_up_initial_window_buffer_and_check(config, network_source, network_destination, loggen, syslog_ng)
     send_additional_one_message_and_check(network_source, loggen, syslog_ng)
-
     start_destination_and_check(config, network_destination)
+
+    syslog_ng.stop()
+
+
+def set_default_config_for_dynamic_window(config, port_allocator):
+    config.update_global_options(stats_level=5)
+    network_source = config.create_network_source(ip="localhost", port=port_allocator(), log_iw_size=1, max_connections=10, dynamic_window_size=200, dynamic_window_realloc_ticks=3)
+    network_destination = config.create_network_destination(ip="localhost", port=port_allocator(), time_reopen=1)
+    config.create_logpath(statements=[network_source, network_destination], flags="flow-control")
+    return config, network_source, network_destination
+
+
+def test_default_dynamic_window(config, syslog_ng, port_allocator, loggen):
+    config, network_source, network_destination = set_default_config_for_dynamic_window(config, port_allocator)
+    syslog_ng.start(config)
 
     syslog_ng.stop()
