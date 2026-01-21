@@ -164,6 +164,9 @@ class SyslogNg(object):
     def is_message_in_console_log(self, expected_message: str) -> bool:
         return self._console_log_reader.is_message_in_console_log(expected_message)
 
+    def are_messages_in_console_log(self, expected_messages: typing.List[str]) -> bool:
+        return self._console_log_reader.are_messages_in_console_log(expected_messages)
+
     def count_message_in_console_log(self, expected_message: str) -> int:
         return self._console_log_reader.count_message_in_console_log(expected_message)
 

@@ -73,6 +73,19 @@ class ConsoleLogReader(object):
                 return True
         return False
 
+    def are_messages_in_console_log(self, expected_messages):
+        console_logs = self.__get_all_console_logs()
+
+        pattern_index = 0
+        for console_log_message in console_logs.split("\n"):
+            if expected_messages[pattern_index] in console_log_message:
+                pattern_index += 1
+                if pattern_index == len(expected_messages):
+                    return True
+
+        logger.error("This pattern was not found in the order in console log: {}".format(expected_messages[pattern_index]))
+        return False
+
     def count_message_in_console_log(self, expected_message):
         console_logs = self.__get_all_console_logs()
         count = 0

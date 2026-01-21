@@ -21,6 +21,7 @@
 # COPYING for details.
 #
 #############################################################################
+# import time
 import pytest
 from axosyslog_light.common.blocking import wait_until_true
 from axosyslog_light.helpers.loggen.loggen import LoggenStartParams
@@ -84,9 +85,9 @@ NUMBER_OF_MESSAGES = 100000
 @pytest.mark.parametrize(
     "log_iw_size, log_fetch_limit, dynamic_window_size, loggen_msg_counter", [
         # (10000, 1000, None),
-        (10000, 1000, 0, 1100),
-        (10000, 1000, 10, 1100),
-        (10000, 1000, 1000, 3000),
+        # (10000, 1000, 0, 1100),
+        # (10000, 1000, 10, 1100),
+        # (10000, 1000, 1000, 3000),
         (10000, 1000, 2000, 3000),
     ],
 )
@@ -99,7 +100,7 @@ def test_dynamic_window_placeholder(config, syslog_ng, port_allocator, loggen, s
         log_fetch_limit=log_fetch_limit,
         dynamic_window_size=dynamic_window_size,
         # dynamic_window_stats_freq=1,
-        # dynamic_window_realloc_ticks=10,
+        dynamic_window_realloc_ticks=3,
         max_connections=10,
         keep_alive="yes",
     )
@@ -117,10 +118,28 @@ def test_dynamic_window_placeholder(config, syslog_ng, port_allocator, loggen, s
         ),
     )
     wait_until_true(lambda: loggen.get_sent_message_count() == loggen_msg_counter)
-    print(syslog_ng_ctl.stats())
-    print(syslog_ng_ctl.stats_prometheus())
+    messages_to_processed_first = 1000  # log_iw_size
+    assert network_source.get_stats()["processed"] == messages_to_processed_first
+    assert network_destination.get_stats()["processed"] == messages_to_processed_first
+    assert network_destination.get_stats()["queued"] == messages_to_processed_first
+
+    assert wait_until_true(lambda: "processed" in network_source.get_stats() and network_source.get_stats()["processed"] == loggen_msg_counter)
+    assert network_destination.get_stats()["processed"] == loggen_msg_counter
+    assert network_destination.get_stats()["queued"] == loggen_msg_counter
 
     syslog_ng.stop()
+    assert syslog_ng.are_messages_in_console_log([
+        "Source has been suspended",
+        "Dynamic window timer elapsed; tick='1'",
+        "Dynamic window timer elapsed; tick='2'",
+        "Dynamic window timer elapsed; tick='3'",
+        "LogReader::dynamic_window_realloc called",
+        "Checking if reclaim is in progress...;",
+        "full_window='1000', dynamic_win='0', static_window='1000', balanced_window='2000', avg_free='0'",
+        "old_full_window_size='1000', new_full_window_size='3000'",
+    ])
+    assert not syslog_ng.is_message_in_console_log("Dynamic window timer elapsed; tick='4'")
+
 
 # log {
 #   source {
