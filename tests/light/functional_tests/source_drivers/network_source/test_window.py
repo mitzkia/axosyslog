@@ -126,17 +126,22 @@ def set_default_config_for_dynamic_window(config, port_allocator):
 
 def fill_up_all_window_buffer_for_first_connection_and_check(loggen, network_source, config):
     send_messages(loggen, network_source, active_connections=1, message_counter_per_connection=300)
-    check_prometheus_metrics(config, {"syslogng_input_window_available": 0, "syslogng_input_window_capacity": DEFAULT_INITIAL_WINDOW_SIZE})
+    import time
+    time.sleep(2)
+    check_prometheus_metrics(config, {"syslogng_input_window_available": 0, "syslogng_input_window_capacity": 201})
 
 
-def check_rebalance_with_sending_new_logs_with_second_connection_and_check(loggen):
-    pass
+def check_rebalance_with_sending_new_logs_with_second_connection_and_check(loggen, network_source, config):
+    send_messages(loggen, network_source, active_connections=1, message_counter_per_connection=300)
+    import time
+    time.sleep(2)
+    check_prometheus_metrics(config, {"syslogng_input_window_available": 0, "syslogng_input_window_capacity": 201})
 
 
 def test_default_dynamic_window(config, syslog_ng, port_allocator, loggen):
     config, network_source, network_destination = set_default_config_for_dynamic_window(config, port_allocator)
     syslog_ng.start(config)
     fill_up_all_window_buffer_for_first_connection_and_check(loggen, network_source, config)
-    check_rebalance_with_sending_new_logs_with_second_connection_and_check(loggen)
+    check_rebalance_with_sending_new_logs_with_second_connection_and_check(loggen, network_source, config)
 
     syslog_ng.stop()

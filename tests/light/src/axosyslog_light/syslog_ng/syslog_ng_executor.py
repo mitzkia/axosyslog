@@ -113,6 +113,15 @@ class SyslogNgExecutor(ABC):
         pass
 
     @abstractmethod
+    def run_process_with_gdb_for_bt(
+        self,
+        start_params: SyslogNgStartParams,
+        stderr_path: Path,
+        stdout_path: Path,
+    ) -> Popen:
+        pass
+
+    @abstractmethod
     def run_process_with_strace(
         self,
         start_params: SyslogNgStartParams,
