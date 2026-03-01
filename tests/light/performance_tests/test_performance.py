@@ -21,11 +21,15 @@
 # COPYING for details.
 #
 #############################################################################
+import asyncio
 import logging
 import time
+from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 import psutil
+import pytest
 from axosyslog_light.common.blocking import wait_until_true_custom
 from axosyslog_light.common.file import copy_shared_file
 from axosyslog_light.helpers.loggen.loggen import LoggenStartParams
@@ -40,68 +44,13 @@ from generate_logs import generate_parsed_cef_json_message
 from generate_logs import generate_parsed_leef_json_message
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
 logger = logging.getLogger(__name__)
 input_message_file_name = Path("input_message.txt")
 file_dst_output_name = Path("file_dst_output.txt")
-
-
-def send_msg_wait_for_finish(loggen, network_source, msg_counter, run_time, input_msg_type, msg_size):
-    input_msg = ""
-    for i in range(100):
-        if input_msg_type == "json":
-            input_msg += generate_json_message(msg_size)
-        elif input_msg_type == "cef":
-            input_msg += generate_cef_message(msg_size)
-        elif input_msg_type == "leef":
-            input_msg += generate_leef_message(msg_size)
-        elif input_msg_type == "kv":
-            input_msg += generate_kv_message(msg_size)
-        elif input_msg_type == "csv":
-            input_msg += generate_csv_message(msg_size)
-        elif input_msg_type == "xml":
-            input_msg += generate_eventlog_xml_message(msg_size)
-        elif input_msg_type == "parsed-cef":
-            input_msg += generate_parsed_cef_json_message(msg_size)
-        elif input_msg_type == "parsed-leef":
-            input_msg += generate_parsed_leef_json_message(msg_size)
-
-    with open(input_message_file_name, "w") as f:
-        if msg_counter != 0:
-            for i in range(int(msg_counter / 100)):
-                f.write(input_msg)
-
-            loggen.start(
-                LoggenStartParams(
-                    target=network_source.options["ip"],
-                    port=network_source.options["port"],
-                    inet=True,
-                    perf=True,
-                    active_connections=1,
-                    number=msg_counter,
-                    read_file=input_message_file_name,
-                    dont_parse=True,
-                    loop_reading=False,
-                ),
-            )
-            assert wait_until_true_custom(lambda: loggen.get_sent_message_count() == msg_counter, timeout=300)
-
-        else:
-            f.write(input_msg)
-            loggen_proc = loggen.start(
-                LoggenStartParams(
-                    target=network_source.options["ip"],
-                    port=network_source.options["port"],
-                    inet=True,
-                    perf=True,
-                    active_connections=1,
-                    interval=run_time,
-                    read_file=input_message_file_name,
-                    dont_parse=True,
-                    loop_reading=True,
-                ),
-            )
-            assert wait_until_true_custom(lambda: loggen_proc.poll() == 0, timeout=run_time + 5)
 
 
 def start_syslog_ng(syslog_ng, config):
@@ -421,9 +370,170 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("run_time", [metafunc.config.getoption("run_time")])
 
 
-def test_performance(request, testcase_parameters, config, syslog_ng, clickhouse_server, clickhouse_ports, port_allocator, loggen, input_msg_type, msg_size, msg_counter, filterx_rule, destination, flow_control, run_time):
-    tc_variants_concat = f"{input_msg_type}_{msg_size}_{msg_counter}_{run_time}_{filterx_rule}_{destination}_{flow_control}"
+class LoggenHelper:
+    def __init__(self, loggen, source_config, input_msg_type, msg_size, msg_counter, run_time):
+        self._task = None
+        self._loggen = loggen
+        self._source_config = source_config
+        self._input_msg_type = input_msg_type
+        self._msg_size = msg_size
+        self._msg_counter = msg_counter
+        self._run_time = run_time
 
+    def get_loggen_stats(self):
+        return self._loggen.get_loggen_stats()
+
+    async def _simulate_log_generation(self):
+        input_msg = ""
+        for i in range(100):
+            if self._input_msg_type == "json":
+                input_msg += generate_json_message(self._msg_size)
+            elif self._input_msg_type == "cef":
+                input_msg += generate_cef_message(self._msg_size)
+            elif self._input_msg_type == "leef":
+                input_msg += generate_leef_message(self._msg_size)
+            elif self._input_msg_type == "kv":
+                input_msg += generate_kv_message(self._msg_size)
+            elif self._input_msg_type == "csv":
+                input_msg += generate_csv_message(self._msg_size)
+            elif self._input_msg_type == "xml":
+                input_msg += generate_eventlog_xml_message(self._msg_size)
+            elif self._input_msg_type == "parsed-cef":
+                input_msg += generate_parsed_cef_json_message(self._msg_size)
+            elif self._input_msg_type == "parsed-leef":
+                input_msg += generate_parsed_leef_json_message(self._msg_size)
+
+        with open(input_message_file_name, "w") as f:
+            if self._msg_counter != 0:
+                for i in range(int(self._msg_counter / 100)):
+                    f.write(input_msg)
+
+                self._loggen.start(
+                    LoggenStartParams(
+                        target=self._source_config.options["ip"],
+                        port=self._source_config.options["port"],
+                        inet=True,
+                        perf=True,
+                        active_connections=1,
+                        number=self._msg_counter,
+                        read_file=input_message_file_name,
+                        dont_parse=True,
+                        loop_reading=False,
+                    ),
+                )
+                await asyncio.to_thread(
+                    wait_until_true_custom,
+                    lambda: self._loggen.get_sent_message_count() == self._msg_counter,
+                    timeout=300,
+                )
+
+            else:
+                f.write(input_msg)
+                loggen_proc = self._loggen.start(
+                    LoggenStartParams(
+                        target=self._source_config.options["ip"],
+                        port=self._source_config.options["port"],
+                        inet=True,
+                        perf=True,
+                        active_connections=1,
+                        interval=self._run_time,
+                        read_file=input_message_file_name,
+                        dont_parse=True,
+                        loop_reading=True,
+                    ),
+                )
+                await asyncio.to_thread(
+                    wait_until_true_custom,
+                    lambda: loggen_proc.poll() == 0,
+                    timeout=self._run_time + 5,
+                )
+
+    @asynccontextmanager
+    async def sending(self):
+        self._task = asyncio.create_task(self._simulate_log_generation())
+        try:
+            yield self
+        finally:
+            await self._task
+
+    async def wait_until_done(self):
+        await self._task
+
+
+class AxosyslogHelper:
+    def __init__(self, syslog_ng_ctl):
+        self._task = None
+        self._syslog_ng_ctl = syslog_ng_ctl
+        self.axosyslog_metrics = []
+
+    async def _simulate_metrics_collection(self):
+        try:
+            while True:
+                metrics = {}
+                prometheus_metrics = self._syslog_ng_ctl.stats_prometheus()["stdout"]
+                for line in prometheus_metrics.splitlines():
+                    if not line:
+                        continue
+                    if "{" in line:
+                        metric_name = line.split("{")[0].strip()
+                    else:
+                        metric_name = line.split()[0].strip()
+
+                    if "result=" in line:
+                        metric_name += "/" + line.split('result="')[1].split('"')[0]
+                    if metric_name not in metrics:
+                        metrics.update({metric_name: []})
+                    metrics[metric_name].append(line)
+
+                metrics["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                self.axosyslog_metrics.append(metrics)
+
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            pass  # Task was cancelled, exit gracefully
+
+    @asynccontextmanager
+    async def collecting_metrics(self):
+        self._task = asyncio.create_task(self._simulate_metrics_collection())
+        try:
+            yield self
+        finally:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+
+    async def wait_until_done(self):
+        while True:
+            if not self.axosyslog_metrics:
+                await asyncio.sleep(0.1)
+                continue
+
+            last_metrics = self.axosyslog_metrics[-1]
+
+            # Check if the required metrics exist
+            if "syslogng_input_events_total" not in last_metrics or "syslogng_output_events_total/delivered" not in last_metrics:
+                await asyncio.sleep(0.1)
+                continue
+
+            intput_events_total = last_metrics["syslogng_input_events_total"][0].split()[1]
+            output_events_total = last_metrics["syslogng_output_events_total/delivered"][0].split()[1]
+
+            if intput_events_total == output_events_total:
+                logger.info(f"Input and output events match: {intput_events_total}")
+                break
+
+            logger.info(f"Waiting for input and output events to match. Current values - Input: {intput_events_total}, Output: {output_events_total}")
+            await asyncio.sleep(0.5)  # Wait before checking again
+
+
+@pytest.mark.asyncio
+async def test_performance(request, config, syslog_ng, syslog_ng_ctl, loggen, port_allocator, input_msg_type, msg_size, msg_counter, filterx_rule, destination, flow_control, run_time, clickhouse_server, clickhouse_ports, testcase_parameters):
+    tc_variants_concat = f"{input_msg_type}_{msg_size}_{msg_counter}_{run_time}_{filterx_rule}_{destination}_{flow_control}"
+    logger.info(f"Starting performance test with configuration: {tc_variants_concat}")
+
+    config.update_global_options(stats_level=5)
     config_statements = []
     network_source = config.create_network_source(ip="localhost", port=port_allocator(), transport="tcp", log_iw_size=100000, log_fetch_limit=10000)
     config_statements.append(network_source)
@@ -443,8 +553,20 @@ def test_performance(request, testcase_parameters, config, syslog_ng, clickhouse
         config.create_logpath(statements=config_statements)
 
     start_syslog_ng(syslog_ng, config)
-    send_msg_wait_for_finish(loggen, network_source, msg_counter, run_time, input_msg_type, msg_size)
-    time.sleep(1)
+
+    loggen = LoggenHelper(loggen, network_source, input_msg_type, msg_size, msg_counter, run_time)
+    axosyslog = AxosyslogHelper(syslog_ng_ctl)
+
+    start_time = asyncio.get_running_loop().time()
+
+    async with loggen.sending(), axosyslog.collecting_metrics():
+        await loggen.wait_until_done()
+        await axosyslog.wait_until_done()
+
+    end_time = asyncio.get_running_loop().time()
+    total_time = end_time - start_time
+
+    logger.debug(f"PerformanceTest: completed in {total_time:.2f} seconds")
 
     try:
         logger.info("destination driver stats for %s: %s", tc_variants_concat, destination_driver.get_stats())
