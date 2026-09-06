@@ -55,6 +55,9 @@ RUN mkdir packages || true \
     && cd axoflow/criterion \
     && export MAKEFLAGS="-j$(nproc)" \
     && abuild checksum \
+    && abuild -r \
+    && cd ../c-ares \
+    && abuild checksum \
     && abuild -r
 
 RUN \
