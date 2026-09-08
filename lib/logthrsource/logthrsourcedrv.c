@@ -25,6 +25,7 @@
 #include "mainloop-threaded-worker.h"
 #include "messages.h"
 #include "apphook.h"
+#include "timeutils/cache.h"
 #include "ack-tracker/ack_tracker_factory.h"
 #include "stats/stats-cluster-key-builder.h"
 
@@ -535,6 +536,8 @@ log_threaded_source_worker_post_with_filterx_context(LogThreadedSourceWorker *se
 
   if (self->control->auto_close_batches)
     log_threaded_source_worker_close_batch(self);
+
+  invalidate_cached_realtime();
 }
 
 gboolean
